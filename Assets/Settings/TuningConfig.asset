@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94bce934f396c3a409a59228fb756b1a, type: 3}
+  m_Name: TuningConfig
+  m_EditorClassIdentifier: Assembly-CSharp::BananaRoulette.TuningConfig
+  monkeyCount: 5
+  circleRadius: 5
+  baseSequenceLength: 3
+  arrowsPerElimination: 1
+  maxSequenceLength: 8
+  hideHudAtAliveCount: 2
+  baseFuseSeconds: 22
+  fuseReductionPerElimination: 2.5
+  minimumFuseSeconds: 8
+  fuseJitter: 0.2
+  errorLockoutSeconds: 0.5
+  botMinSecondsPerArrow: 0.35
+  botMaxSecondsPerArrow: 0.7
+  botErrorChance: 0.12
+  botRevengeChance: 0.3
+  passFlightSeconds: 0.35
+  explosionPauseSeconds: 1.6
+  showFuseDebug: 0
+  verboseLog: 1
