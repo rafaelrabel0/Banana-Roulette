@@ -42,6 +42,15 @@ namespace BananaRoulette
 
         private float _burned;
         private bool _exploded;
+        private PavioTopo3D _tres;
+
+        /// <summary>Troca a barra desenhada pelo pavio em 3D. A barra antiga some e so repassa as ordens.</summary>
+        public void Usar3D(PavioTopo3D pavio)
+        {
+            _tres = pavio;
+            if (_tres == null) return;
+            foreach (var g in GetComponentsInChildren<Graphic>(true)) g.enabled = false;
+        }
 
         public static TopFuseBar Build(Transform parent)
         {
@@ -195,6 +204,7 @@ namespace BananaRoulette
         /// <summary>Pavio novo: cordao inteiro e dinamite de volta.</summary>
         public void ResetFuse()
         {
+            if (_tres != null) _tres.ResetFuse();
             _exploded = false;
             _burned = 0f;
 
@@ -218,6 +228,7 @@ namespace BananaRoulette
         /// <summary>Recebe a mesma fracao queimada que a banana na mao do macaco.</summary>
         public void SetProgress(float burnedFraction)
         {
+            if (_tres != null) _tres.SetProgress(burnedFraction);
             if (_exploded) return;
             _burned = Mathf.Clamp01(burnedFraction);
             Apply(_burned);
@@ -260,6 +271,7 @@ namespace BananaRoulette
         /// <summary>A dinamite do topo estoura junto com a da mao do macaco.</summary>
         public IEnumerator Explode()
         {
+            if (_tres != null) StartCoroutine(_tres.Explode());
             if (_exploded) yield break;
             _exploded = true;
 
@@ -310,6 +322,7 @@ namespace BananaRoulette
         /// </summary>
         public void FlashBurn()
         {
+            if (_tres != null) _tres.FlashBurn();
             if (_exploded) return;
             StartCoroutine(FlashBurnRoutine());
         }
@@ -333,6 +346,7 @@ namespace BananaRoulette
 
         public void SetVisible(bool visible)
         {
+            if (_tres != null) _tres.gameObject.SetActive(visible);
             gameObject.SetActive(visible);
         }
     }

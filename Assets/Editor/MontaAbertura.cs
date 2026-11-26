@@ -9,7 +9,7 @@ namespace BananaRoulette.EditorTools
     /// <summary>
     /// Menu "Banana Roulette > Montar cena de abertura".
     ///
-    /// Cria a cena Assets/Scenes/Abertura.unity a partir de Assets/Abertura/abertura.glb:
+    /// Cria a cena Assets/Scenes/Abertura.unity a partir de Assets/Resources/Abertura/abertura.glb:
     /// poe o modelo na cena, cria o Animator com o clipe assado, a camera, a luz e
     /// liga tudo no AberturaPlayer. Pode rodar de novo quando o .glb mudar.
     /// </summary>

@@ -48,18 +48,25 @@ namespace BananaRoulette
 
         void Start()
         {
-            TrocarMateriais();
+            Trocar(FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None));
             MontarTela();
         }
 
+        static readonly Dictionary<Material, Material> feitos = new Dictionary<Material, Material>();
+
+        /// <summary>Troca na hora os materiais de um modelo recem-criado (macaco, bomba) pelo shader retro.</summary>
+        public static void Converter(GameObject raiz)
+        {
+            if (raiz != null) Trocar(raiz.GetComponentsInChildren<Renderer>(true));
+        }
+
         // Troca os materiais do .glb (glTFast) pelo shader retro. Cada material e trocado uma vez so.
-        void TrocarMateriais()
+        static void Trocar(Renderer[] lista)
         {
             Shader retro = Shader.Find("BananaRoulette/Retro");
             if (retro == null) { Debug.LogWarning("[Visual retro] Shader BananaRoulette/Retro nao encontrado."); return; }
 
-            var feitos = new Dictionary<Material, Material>();
-            foreach (Renderer r in FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (Renderer r in lista)
             {
                 Material[] ms = r.sharedMaterials;
                 bool mudou = false;
@@ -71,7 +78,7 @@ namespace BananaRoulette
                     if (m.renderQueue >= 2450) continue;
 
                     Material novo;
-                    if (!feitos.TryGetValue(m, out novo))
+                    if (!feitos.TryGetValue(m, out novo) || novo == null)
                     {
                         novo = new Material(retro) { name = m.name };
                         Texture tex = m.HasProperty("baseColorTexture") ? m.GetTexture("baseColorTexture") : null;

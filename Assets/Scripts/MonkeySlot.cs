@@ -18,6 +18,40 @@ namespace BananaRoulette
         private Vector3 _homePosition;
         private float _jugglePhase;
         private bool _isHolding;
+        private MacacoVisual _visual;
+
+        /// <summary>Quanto do pavio ja queimou (0 a 1). A partida atualiza; os macacos reagem.</summary>
+        public static float Tensao;
+
+        /// <summary>Liga o modelo 3D a este lugar da roda. A capsula do greybox some.</summary>
+        public void UsarModelo(MacacoVisual visual)
+        {
+            _visual = visual;
+            if (_visual != null && _renderer != null) _renderer.enabled = false;
+        }
+
+        public MacacoVisual Visual { get { return _visual; } }
+
+        /// <summary>Animacao de arremesso para o lado onde o alvo esta.</summary>
+        public void Arremessar(Vector3 alvo)
+        {
+            if (_visual == null) return;
+            // no modelo, jogaE vai para a esquerda do proprio macaco
+            float lado = transform.InverseTransformPoint(alvo).x;
+            _visual.Tocar(lado < 0f ? "jogaE" : "jogaD");
+        }
+
+        /// <summary>Animacao de esperar e receber a bomba.</summary>
+        public void Receber()
+        {
+            if (_visual != null) _visual.Tocar("recebe");
+        }
+
+        /// <summary>Pulinho a cada seta acertada.</summary>
+        public void Acertou()
+        {
+            if (_visual != null) _visual.Pulo();
+        }
 
         public void Setup(int index, bool isHuman, Color color, Renderer bodyRenderer)
         {
@@ -44,6 +78,14 @@ namespace BananaRoulette
         {
             if (!IsAlive) return;
 
+            if (_visual != null)
+            {
+                // Quanto mais curto o pavio, mais desesperado quem segura; os outros so se assustam no fim.
+                if (_isHolding) _visual.Laco(Tensao > 0.7f ? "segura3" : Tensao > 0.38f ? "segura2" : "segura1");
+                else _visual.Laco(Tensao > 0.45f ? "olhando" : "parado");
+                return;
+            }
+
             // Idle nervoso: respiracao leve. Segurando a banana: balanco mais agitado.
             float speed = _isHolding ? 9f : 2.2f;
             float amount = _isHolding ? 0.09f : 0.03f;
@@ -69,6 +111,7 @@ namespace BananaRoulette
         /// <summary>Piscada de erro: quem errou a sequencia deixa a banana escapar.</summary>
         public void FlashError()
         {
+            if (_visual != null) { _visual.Tocar("erro"); _visual.Piscar(Palette.DynamiteRed); return; }
             if (_renderer == null) return;
             StopAllCoroutines();
             StartCoroutine(FlashRoutine());
@@ -87,6 +130,7 @@ namespace BananaRoulette
             IsAlive = false;
             _isHolding = false;
             StopAllCoroutines();
+            if (_visual != null) { _visual.Tocar("explode", true); _visual.Tostar(); return; }
             StartCoroutine(ExplodeRoutine());
         }
 
@@ -130,6 +174,7 @@ namespace BananaRoulette
         public void Celebrate()
         {
             StopAllCoroutines();
+            if (_visual != null) { _visual.Laco("vence"); return; }
             StartCoroutine(CelebrateRoutine());
         }
 
@@ -146,7 +191,16 @@ namespace BananaRoulette
 
         public Vector3 HandPosition
         {
-            get { return transform.position + Vector3.up * 1.35f; }
+            get { return _visual != null && _visual.PontoMaco != null ? _visual.PontoMaco.position : transform.position + Vector3.up * 1.35f; }
+        }
+
+        /// <summary>Giro da bomba enquanto esta na mao (o modelo 3D faz malabarismo com ela).</summary>
+        public bool TryGetHandRotation(out Quaternion rotation)
+        {
+            rotation = Quaternion.identity;
+            if (_visual == null || _visual.PontoMaco == null) return false;
+            rotation = _visual.PontoMaco.rotation;
+            return true;
         }
     }
 }

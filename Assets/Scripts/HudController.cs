@@ -104,6 +104,25 @@ namespace BananaRoulette
             Loc.OnLanguageChanged += RefreshStaticText;
         }
 
+        /// <summary>
+        /// Na partida em 3D a fila de setas sobe para o meio da roda, que fica vazio:
+        /// no lugar antigo ela tapava a bomba na mao do jogador.
+        /// </summary>
+        public void Layout3D()
+        {
+            if (_keyRow != null) _keyRow.anchoredPosition = new Vector2(0f, 48f);
+            if (_hintText != null) _hintText.rectTransform.anchoredPosition = new Vector2(0f, -40f);
+            if (_statusText != null) _statusText.rectTransform.anchoredPosition = new Vector2(0f, -132f);
+            // o cenario agora e claro: contorno escuro para o texto nao sumir
+            foreach (var t in new[] { _statusText, _aliveText, _hintText, _escHintText, _fuseDebugText })
+            {
+                if (t == null || t.GetComponent<Outline>() != null) continue;
+                var o = t.gameObject.AddComponent<Outline>();
+                o.effectColor = new Color(0.08f, 0.05f, 0.03f, 0.9f);
+                o.effectDistance = new Vector2(2.5f, -2.5f);
+            }
+        }
+
         private void OnDestroy()
         {
             Loc.OnLanguageChanged -= RefreshStaticText;

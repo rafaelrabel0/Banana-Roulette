@@ -9,6 +9,7 @@ Shader "BananaRoulette/Retro"
         _BaseMap ("Textura", 2D) = "white" {}
         _BaseColor ("Cor", Color) = (1, 1, 1, 1)
         [Toggle] _SemLuz ("Sem luz (contorno e tinta)", Float) = 0
+        [Toggle] _SemSombra ("Nao recebe sombra (o que fica colado na tela)", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Lado desenhado", Float) = 2
     }
 
@@ -23,6 +24,7 @@ Shader "BananaRoulette/Retro"
             float4 _BaseMap_ST;
             half4 _BaseColor;
             float _SemLuz;
+            float _SemSombra;
             float _Cull;
         CBUFFER_END
 
@@ -92,7 +94,7 @@ Shader "BananaRoulette/Retro"
                     if (dot(n, v) < 0.0) n = -n;
                     Light luz = GetMainLight(TransformWorldToShadowCoord(i.positionWS));
                     half nl = saturate(dot(n, luz.direction));
-                    half3 total = luz.color * (nl * luz.shadowAttenuation) + SampleSH(n);
+                    half3 total = luz.color * (nl * lerp(luz.shadowAttenuation, 1.0, _SemSombra)) + SampleSH(n);
                     c.rgb *= total;
                 }
                 c.rgb = MixFog(c.rgb, i.fog);

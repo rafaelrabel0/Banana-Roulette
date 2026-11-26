@@ -104,6 +104,7 @@ namespace BananaRoulette
                 float burned = _fuse.IsRunning ? _fuse.BurnedFraction : 0f;
 
                 if (_banana != null) _banana.UpdateFuseVisual(burned);
+                MonkeySlot.Tensao = burned;
 
                 // A barra do topo anda pela MESMA fracao: e o mesmo pavio, visto
                 // de outro jeito.
@@ -208,6 +209,7 @@ namespace BananaRoulette
             solver.OnArrowHit += progress =>
             {
                 if (holder.IsHuman && !memoryRound) _hud.RegisterHit(progress);
+                holder.Acertou();
             };
             solver.OnArrowMissed += () => HandleMiss(holder);
             solver.OnPassChosen += side => { _chosenSide = side; _turnResolved = true; };
@@ -266,6 +268,8 @@ namespace BananaRoulette
             if (nextIndex < 0) yield break;
 
             _slots[_holderIndex].SetHolding(false);
+            _slots[_holderIndex].Arremessar(_slots[nextIndex].transform.position);
+            _slots[nextIndex].Receber();
             _lastPasserIndex = _holderIndex;
 
             // A posse muda no instante do arremesso: quem passou a tempo se

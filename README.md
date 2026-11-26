@@ -92,7 +92,7 @@ peças e 41 s de movimento.
 
 | Arquivo | O que é |
 |---------|---------|
-| `Assets/Abertura/abertura.glb` | A cena inteira, com a animação. 12 MB, vai por Git LFS |
+| `Assets/Resources/Abertura/abertura.glb` | A cena inteira, com a animação. 12 MB, vai por Git LFS |
 | `Assets/Abertura/abertura.json` | O que o `.glb` não carrega: campo de visão por quadro, quando é céu, quando entra o letreiro |
 | `Assets/Abertura/Modelos/*.glb` | Macaco, aviador, caixote, maço de dinamite e carimbo, soltos e parados |
 | `Assets/Scripts/Abertura/AberturaPlayer.cs` | Toca a cena e move a câmera |
@@ -145,10 +145,30 @@ O **idioma** troca tudo de uma vez: a tinta dos caixotes, da tampa e dos crédit
 `*-en.png` em `Assets/Resources/Abertura`), as dicas no pé da tela, as páginas e a partida.
 As marcas dos caixotes do cenário (EXPLOSIVOS, DINAMITE) ficam em português: são parte do desenho.
 
+### Partida em 3D
+
+Desde 26/11/2026 a partida usa os modelos da abertura. A regra é a mesma do protótipo.
+
+| Arquivo | O que faz |
+|---------|-----------|
+| `Assets/Resources/Jogo/macaco-jogo.glb` + `.json` | O macaco sentado, com um clipe de 9 s que traz todas as animações em fila; o `.json` diz onde cada uma começa |
+| `Assets/Resources/Jogo/maco-jogo.glb` | O maço de dinamite (a bomba) |
+| `Assets/Scripts/Jogo3D/MacacoVisual.cs` | Toca as animações: parado, olhando, segura1/2/3, erro, jogaE, jogaD, recebe, explode, vence. Troca a cor do pelo |
+| `Assets/Scripts/Jogo3D/PavioTopo3D.cs` | O pavio do topo da tela em 3D, preso à câmera |
+| `GameBootstrap.BuildWorld` | Monta em volta da roda o mesmo cenário da abertura |
+
+Quem segura a bomba fica mais desesperado conforme o pavio queima (`MonkeySlot.Tensao`).
+Para voltar ao greybox de cápsulas: objeto `GameBootstrap` na cena `Prototipo`, desmarcar **Usar 3D**.
+
+As animações nascem na prévia (`poseJogo` em `cena-abertura.html`) e são exportadas por
+`__cena.exportaJogo()`. No Inspector do `macaco-jogo.glb`, **Animation** precisa estar em **Legacy**.
+
 ### O que ainda não veio
 
+- Som da partida, fumaça na explosão.
+- Menu reorganizado, personalização do macaco, menu de pausa no caixote, tutorial novo, power-ups.
+
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
-- A **partida** ainda é greybox (cápsulas); só ganhou o pixel aparente.
 - O **traço de desenho** (sombra em degraus) e **balões com transparência suave**.
 - Som e música de verdade: o que toca é rascunho sintetizado.
 - Otimização: são cerca de 5.400 objetos. Serve para ver, não para entregar.

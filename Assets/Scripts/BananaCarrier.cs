@@ -23,6 +23,82 @@ namespace BananaRoulette
         private float _cordBaseY;
         private float _burnFlash;
 
+        // --- versao 3D (maco de dinamite da previa) ---
+        private bool _tresD;
+        private Vector3[] _curva;          // caminho do pavio, no espaco do modelo
+        private UnityEngine.Mesh _malhaPavio;
+        private Material[] _corpo;
+        private Color[] _corpoBase;
+        private float _raioPavio;
+
+        /// <summary>
+        /// Liga o modelo 3D. curva = pontos por onde o pavio passa (do maco ate a ponta), no espaco do modelo;
+        /// pavio = objeto vazio com MeshFilter onde o cordao e redesenhado conforme queima.
+        /// </summary>
+        public void Setup3D(Transform fuseSpark, Renderer sparkRenderer, MeshFilter pavio, Vector3[] curva,
+            float raioPavio, Material[] corpo)
+        {
+            _tresD = true;
+            _fuseSpark = fuseSpark;
+            _sparkRenderer = sparkRenderer;
+            _curva = Suaviza(curva, 5);
+            _raioPavio = raioPavio;
+            _malhaPavio = new UnityEngine.Mesh();
+            pavio.sharedMesh = _malhaPavio;
+            _corpo = corpo;
+            _corpoBase = new Color[corpo.Length];
+            for (int i = 0; i < corpo.Length; i++) _corpoBase[i] = corpo[i].HasProperty("_BaseColor") ? corpo[i].GetColor("_BaseColor") : Color.white;
+            UpdateFuseVisual(0f);
+        }
+
+        // Curva suave passando pelos pontos (Catmull-Rom), com "passos" pedacos entre cada par.
+        private static Vector3[] Suaviza(Vector3[] p, int passos)
+        {
+            var saida = new System.Collections.Generic.List<Vector3>();
+            for (int i = 0; i < p.Length - 1; i++)
+            {
+                Vector3 a = p[Mathf.Max(0, i - 1)], b = p[i], c = p[i + 1], d = p[Mathf.Min(p.Length - 1, i + 2)];
+                for (int k = 0; k < passos; k++)
+                {
+                    float t = (float)k / passos, t2 = t * t, t3 = t2 * t;
+                    saida.Add(0.5f * ((2f * b) + (-a + c) * t + (2f * a - 5f * b + 4f * c - d) * t2 + (-a + 3f * b - 3f * c + d) * t3));
+                }
+            }
+            saida.Add(p[p.Length - 1]);
+            return saida.ToArray();
+        }
+
+        /// <summary>Cordao de 4 lados ao longo dos primeiros "ate" pontos da curva (com fracao no ultimo).</summary>
+        public static Vector3 DesenhaCordao(UnityEngine.Mesh malha, Vector3[] curva, float fracao, float raio)
+        {
+            float alvo = Mathf.Clamp01(fracao) * (curva.Length - 1);
+            int cheios = Mathf.FloorToInt(alvo);
+            var pts = new System.Collections.Generic.List<Vector3>();
+            for (int i = 0; i <= cheios && i < curva.Length; i++) pts.Add(curva[i]);
+            if (cheios < curva.Length - 1 && alvo - cheios > 0.001f) pts.Add(Vector3.Lerp(curva[cheios], curva[cheios + 1], alvo - cheios));
+            if (pts.Count < 2) pts.Add(pts[0] + (curva[1] - curva[0]).normalized * 0.01f);
+
+            var vs = new Vector3[pts.Count * 4]; var ts = new int[(pts.Count - 1) * 48];
+            for (int i = 0; i < pts.Count; i++)
+            {
+                Vector3 dir = (pts[Mathf.Min(pts.Count - 1, i + 1)] - pts[Mathf.Max(0, i - 1)]).normalized;
+                Vector3 lado = Vector3.Cross(dir, Mathf.Abs(dir.y) > 0.9f ? Vector3.right : Vector3.up).normalized;
+                Vector3 cima = Vector3.Cross(lado, dir);
+                vs[i * 4] = pts[i] + lado * raio; vs[i * 4 + 1] = pts[i] + cima * raio; vs[i * 4 + 2] = pts[i] - lado * raio; vs[i * 4 + 3] = pts[i] - cima * raio;
+            }
+            int n = 0;
+            for (int i = 0; i < pts.Count - 1; i++)
+                for (int k = 0; k < 4; k++)
+                {
+                    int a = i * 4 + k, b = i * 4 + (k + 1) % 4, c = a + 4, d = b + 4;
+                    ts[n++] = a; ts[n++] = c; ts[n++] = b; ts[n++] = b; ts[n++] = c; ts[n++] = d;
+                    // as duas faces, para o cordao aparecer de qualquer lado
+                    ts[n++] = a; ts[n++] = b; ts[n++] = c; ts[n++] = b; ts[n++] = d; ts[n++] = c;
+                }
+            malha.Clear(); malha.vertices = vs; malha.triangles = ts; malha.RecalculateBounds();
+            return pts[pts.Count - 1];
+        }
+
         public void Setup(Renderer bodyRenderer, Transform fuseCord, Transform fuseSpark,
             Renderer sparkRenderer)
         {
@@ -97,7 +173,13 @@ namespace BananaRoulette
 
         private void Update()
         {
-            if (!_inFlight && _holder != null)
+            Quaternion giro;
+            if (!_inFlight && _holder != null && _holder.TryGetHandRotation(out giro))
+            {
+                // 3D: a bomba segue a mao do macaco, que ja faz o malabarismo na animacao
+                transform.SetPositionAndRotation(_holder.HandPosition, giro);
+            }
+            else if (!_inFlight && _holder != null)
             {
                 transform.position = _holder.HandPosition + Vector3.up * Mathf.Sin(Time.time * 7f) * 0.12f;
                 transform.Rotate(Vector3.forward, 160f * Time.deltaTime, Space.Self);
@@ -112,6 +194,7 @@ namespace BananaRoulette
         /// </summary>
         public void UpdateFuseVisual(float burnedFraction)
         {
+            if (_tresD) { Atualiza3D(burnedFraction); return; }
             if (_fuseCord == null || _fuseSpark == null) return;
 
             float remaining = Mathf.Clamp01(1f - burnedFraction);
@@ -146,6 +229,27 @@ namespace BananaRoulette
                     Palette.DynamiteRed, Color.white,
                     Mathf.Clamp01(burnedFraction * 0.22f * pulse + _burnFlash * 0.5f));
             }
+        }
+
+        private void Atualiza3D(float burnedFraction)
+        {
+            float resta = Mathf.Clamp01(1f - burnedFraction);
+            Vector3 ponta = DesenhaCordao(_malhaPavio, _curva, Mathf.Max(0.04f, resta), _raioPavio);
+
+            float rate = Mathf.Lerp(5f, 26f, burnedFraction);
+            float pulse = 0.65f + Mathf.Abs(Mathf.Sin(Time.time * rate)) * 0.85f;
+            float flash = 1f + _burnFlash * 1.8f;
+            if (_fuseSpark != null)
+            {
+                _fuseSpark.localPosition = ponta;
+                _fuseSpark.localScale = Vector3.one * pulse * flash;
+            }
+            if (_sparkRenderer != null && _sparkRenderer.sharedMaterial.HasProperty("_BaseColor"))
+                _sparkRenderer.sharedMaterial.SetColor("_BaseColor", Color.Lerp(new Color(0.95f, 0.54f, 0.1f), Color.white, Mathf.Clamp01(burnedFraction * 0.5f + _burnFlash)));
+
+            float branco = Mathf.Clamp01(burnedFraction * 0.22f * pulse + _burnFlash * 0.5f);
+            for (int i = 0; i < _corpo.Length; i++)
+                if (_corpo[i].HasProperty("_BaseColor")) _corpo[i].SetColor("_BaseColor", Color.Lerp(_corpoBase[i], Color.white, branco));
         }
 
         /// <summary>Estouro visual quando um erro queima pavio de uma vez.</summary>
