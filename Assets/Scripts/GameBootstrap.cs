@@ -67,7 +67,12 @@ namespace BananaRoulette
             _banana = BuildBanana();
             _canvas = BuildCanvas();
             _hud = BuildHud(_canvas);
-            if (usar3D && _hud.TopFuse != null) _hud.TopFuse.Usar3D(PavioTopo3D.Criar(camera));
+            if (usar3D && _hud.TopFuse != null)
+            {
+                var pavioTopo = PavioTopo3D.Criar(camera);
+                Aparencia.PintaBomba(pavioTopo.gameObject, GameSettings.Bomb);
+                _hud.TopFuse.Usar3D(pavioTopo);
+            }
             if (usar3D) _hud.Layout3D();
             var flash = BuildFlashLight();
 
@@ -300,7 +305,10 @@ namespace BananaRoulette
                 if (usar3D)
                 {
                     // a capsula fica a 1 de altura; o modelo desce para sentar no chao
-                    slot.UsarModelo(MacacoVisual.Criar(body.transform, new Vector3(0f, -1f, 0f), Escala, Pelos[i % Pelos.Length]));
+                    var visual = MacacoVisual.Criar(body.transform, new Vector3(0f, -1f, 0f), Escala, Pelos[i % Pelos.Length]);
+                    if (isHuman) Aparencia.VestirJogador(visual);
+                    else Aparencia.VestirBot(visual, i);
+                    slot.UsarModelo(visual);
                 }
 
                 TurnSolver solver;
@@ -382,6 +390,7 @@ namespace BananaRoulette
             var copia = Instantiate(modelo, root.transform);
             copia.transform.localScale = Vector3.one * Escala * 1.4f; // um pouco maior que o real, para se ver de longe
             VisualRetro.Converter(copia);
+            Aparencia.PintaBomba(copia, GameSettings.Bomb);
 
             Transform faisca = null, pavioVelho = null;
             foreach (Transform t in copia.GetComponentsInChildren<Transform>(true))

@@ -163,10 +163,29 @@ Para voltar ao greybox de cápsulas: objeto `GameBootstrap` na cena `Prototipo`,
 As animações nascem na prévia (`poseJogo` em `cena-abertura.html`) e são exportadas por
 `__cena.exportaJogo()`. No Inspector do `macaco-jogo.glb`, **Animation** precisa estar em **Legacy**.
 
+### Menu, primeira vez e personalização
+
+- **Menu:** JOGAR grande, OPÇÕES menor, TUTORIAL e PERSONAGEM lado a lado, CRÉDITOS por último.
+  Quem nunca jogou vê o TUTORIAL logo abaixo do JOGAR. As quatro pinturas (duas arrumações × dois
+  idiomas) e as áreas de clique estão em `Assets/Resources/Abertura/menu-frente-*.png` e `menu-frente.json`.
+- **Primeira vez:** ao clicar em JOGAR sem nunca ter jogado, a tampa do caixote de trás pergunta se
+  quer o tutorial. A resposta fica guardada (`GameSettings.Played`).
+- **PERSONAGEM:** as escolhas ficam escritas na frente do caixote do menu e o macaco aparece ao lado,
+  mudando na hora. Dá para trocar a cor do pelo, o que vai na cabeça (palha, boné, cartola, fone),
+  os óculos, o brinco e a cor da bomba (amarela, verde, podre).
+
+| Arquivo | O que faz |
+|---------|-----------|
+| `Assets/Scripts/Jogo3D/Aparencia.cs` | A lista do que existe: pelos, acessórios e cores de bomba. Veste o jogador e sorteia a roupa dos bots |
+| `MacacoVisual.Vestir` | Liga os acessórios escolhidos. Eles já vêm dentro do `macaco-jogo.glb`, em grupos `Ac_lugar_nome` |
+
+Para criar um acessório: modelar na função `acessorios` da prévia, rodar `__cena.exportaJogo()`
+e acrescentar o nome na lista de `Aparencia.cs`.
+
 ### O que ainda não veio
 
 - Som da partida, fumaça na explosão.
-- Menu reorganizado, personalização do macaco, menu de pausa no caixote, tutorial novo, power-ups.
+- Menu de pausa no caixote, tutorial novo, power-ups.
 
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
 - O **traço de desenho** (sombra em degraus) e **balões com transparência suave**.

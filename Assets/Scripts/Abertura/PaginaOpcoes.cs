@@ -18,7 +18,11 @@ namespace BananaRoulette
     /// </summary>
     public class PaginaOpcoes : MonoBehaviour
     {
-        const float Largura = 1030f, Altura = 750f, Escala = 0.01f; // a tampa tem 10,3 x 7,5
+        const float Escala = 0.01f;
+        // tamanho da face, em centesimos de unidade. A tampa tem 10,3 x 7,5; a frente do caixote, 10 x 6,2
+        static float Largura = 1030f;
+        float larg = 1030f, alt = 750f;
+        float K { get { return alt / 750f; } } // tudo foi medido para a tampa; noutras faces encolhe junto
         static readonly Color Tinta = new Color(0.13f, 0.07f, 0.05f, 1f);
         static readonly Color TintaFraca = new Color(0.13f, 0.07f, 0.05f, 0.72f);
         static readonly Color Marcada = new Color(0.70f, 0.13f, 0.10f, 1f);
@@ -28,8 +32,9 @@ namespace BananaRoulette
             public Func<string> rotulo;
             public Func<string> valor;   // nulo = linha sem valor (aviso ou VOLTAR)
             public Action<int> muda;     // recebe -1 ou +1
+            public string acao;          // linha que so dispara AoEscolher(acao)
             public bool voltar;
-            public bool Escolhivel { get { return muda != null || voltar; } }
+            public bool Escolhivel { get { return muda != null || voltar || acao != null; } }
             public float y, meiaAltura;
         }
 
@@ -54,6 +59,11 @@ namespace BananaRoulette
 
         public bool Aberta { get; private set; }
 
+        /// <summary>Chamado depois de qualquer valor mudar (a tela de personagem usa para vestir o macaco na hora).</summary>
+        public Action AoMudar;
+        /// <summary>Chamado quando o jogador escolhe uma linha de acao (aviso de primeira vez: "tutorial" ou "jogar").</summary>
+        public Action<string> AoEscolher;
+
         static string T(string pt, string en) { return Loc.Current == Language.Portuguese ? pt : en; }
         static string Liga(bool v) { return Loc.Get(v ? "set.on" : "set.off"); }
         static string Pct(float v) { return Mathf.RoundToInt(v * 100f) + "%"; }
@@ -61,16 +71,23 @@ namespace BananaRoulette
         /// <summary>Cria a pagina deitada sobre a tampa. meiaEspessura = metade da grossura da tampa.</summary>
         public static PaginaOpcoes Criar(Transform tampa, float meiaEspessura)
         {
-            var go = new GameObject("Pagina de opcoes");
-            go.transform.SetParent(tampa, false);
-            go.transform.localPosition = new Vector3(0f, meiaEspessura + 0.03f, 0f);
             // letras de pe para quem olha da camera da pagina: "cima" do texto aponta para o fundo do caixote
-            go.transform.localRotation = Quaternion.LookRotation(Vector3.down, Vector3.back);
+            return Criar(tampa, new Vector3(0f, meiaEspessura + 0.03f, 0f), Quaternion.LookRotation(Vector3.down, Vector3.back), 1030f, 750f);
+        }
+
+        /// <summary>Cria a pagina em qualquer face. largura e altura em centesimos de unidade (10 de largura = 1000).</summary>
+        public static PaginaOpcoes Criar(Transform pai, Vector3 posLocal, Quaternion giroLocal, float largura, float altura)
+        {
+            var go = new GameObject("Pagina de opcoes");
+            go.transform.SetParent(pai, false);
+            go.transform.localPosition = posLocal;
+            go.transform.localRotation = giroLocal;
             go.transform.localScale = Vector3.one * Escala;
             var p = go.AddComponent<PaginaOpcoes>();
+            p.larg = largura; p.alt = altura;
             p.textoTitulo = p.NovoTexto("Titulo");
-            p.textoTitulo.t.localPosition = new Vector3(0f, 285f, 0f);
-            for (int i = 0; i < 6; i++) p.textos.Add(p.NovoTexto("Linha " + i));
+            p.textoTitulo.t.localPosition = new Vector3(0f, 285f * p.K, 0f);
+            for (int i = 0; i < 7; i++) p.textos.Add(p.NovoTexto("Linha " + i));
             go.SetActive(false);
             return p;
         }
@@ -117,6 +134,21 @@ namespace BananaRoulette
                     Add(() => T("Idioma", "Language"), () => Loc.Get(Loc.Current == Language.Portuguese ? "set.pt" : "set.en"),
                         dir => GameSettings.SetLanguage(Loc.Current == Language.Portuguese ? Language.English : Language.Portuguese));
                     break;
+                case "personagem":
+                    titulo = () => T("PERSONAGEM", "CHARACTER");
+                    Add(() => T("Pelo", "Fur"), () => Aparencia.Pelo(GameSettings.Fur).Nome, dir => GameSettings.SetFur(Roda(GameSettings.Fur + dir, Aparencia.Pelos.Length)));
+                    Add(() => T("Cabeça", "Head"), () => Aparencia.Chapeu(GameSettings.Hat).Nome, dir => GameSettings.SetHat(Roda(GameSettings.Hat + dir, Aparencia.Chapeus.Length)));
+                    Add(() => T("Óculos", "Glasses"), () => Aparencia.Oculo(GameSettings.Glasses).Nome, dir => GameSettings.SetGlasses(Roda(GameSettings.Glasses + dir, Aparencia.Oculos.Length)));
+                    Add(() => T("Brinco", "Earring"), () => Aparencia.Brinco(GameSettings.Earring).Nome, dir => GameSettings.SetEarring(Roda(GameSettings.Earring + dir, Aparencia.Brincos.Length)));
+                    Add(() => T("Bomba", "Bomb"), () => Aparencia.Bomba(GameSettings.Bomb).Nome, dir => GameSettings.SetBomb(Roda(GameSettings.Bomb + dir, Aparencia.Bombas.Length)));
+                    break;
+                case "primeira":
+                    titulo = () => T("PRIMEIRA VEZ?", "FIRST TIME?");
+                    Aviso(() => T("Esta é a sua primeira vez jogando Banana Roulette.", "This is your first time playing Banana Roulette."));
+                    Aviso(() => T("Quer fazer o tutorial?", "Would you like to do the tutorial?"));
+                    linhas.Add(new Linha { rotulo = () => T("Sim, quero o tutorial", "Yes, show me the tutorial"), acao = "tutorial" });
+                    linhas.Add(new Linha { rotulo = () => T("Não, quero jogar", "No, let me play"), acao = "jogar" });
+                    break;
                 case "jogabilidade":
                     titulo = () => T("JOGABILIDADE", "GAMEPLAY");
                     Add(() => T("Teclas", "Keys"), () => GameSettings.UseLetters ? T("LETRAS (W A S D)", "LETTERS (W A S D)") : T("SETAS", "ARROWS"),
@@ -133,9 +165,9 @@ namespace BananaRoulette
             linhas.Add(new Linha { rotulo = () => Loc.Get("set.back"), voltar = true });
 
             // espalha as linhas pela tampa, abaixo do titulo
-            float topo = 160f, pe = -285f;
-            float passo = linhas.Count > 1 ? Mathf.Min(125f, (topo - pe) / (linhas.Count - 1)) : 0f;
-            for (int i = 0; i < linhas.Count; i++) { linhas[i].y = topo - passo * i; linhas[i].meiaAltura = Mathf.Max(38f, passo * 0.5f); }
+            float topo = 160f * K, pe = -285f * K;
+            float passo = linhas.Count > 1 ? Mathf.Min(125f * K, (topo - pe) / (linhas.Count - 1)) : 0f;
+            for (int i = 0; i < linhas.Count; i++) { linhas[i].y = topo - passo * i; linhas[i].meiaAltura = Mathf.Max(38f * K, passo * 0.5f); }
             linhas[linhas.Count - 1].y = pe;
 
             sel = 0;
@@ -147,6 +179,8 @@ namespace BananaRoulette
 
         public void Fechar() { Aberta = false; gameObject.SetActive(false); }
 
+        static int Roda(int i, int n) { return ((i % n) + n) % n; }
+
         void Add(Func<string> rotulo, Func<string> valor, Action<int> muda) { linhas.Add(new Linha { rotulo = rotulo, valor = valor, muda = muda }); }
         void Aviso(Func<string> texto) { linhas.Add(new Linha { rotulo = texto }); }
         void Volume(Func<string> rotulo, Func<float> le, Action<float> grava)
@@ -156,7 +190,8 @@ namespace BananaRoulette
 
         void Desenhar()
         {
-            textoTitulo.Poe(titulo().ToUpperInvariant(), 80f, Tinta);
+            Largura = larg;
+            textoTitulo.Poe(titulo().ToUpperInvariant(), 80f * K, Tinta);
             for (int i = 0; i < textos.Count; i++)
             {
                 Risco t = textos[i];
@@ -167,9 +202,10 @@ namespace BananaRoulette
                 t.t.localPosition = new Vector3(0f, l.y, 0f);
                 bool marcada = i == sel && l.Escolhivel;
                 Color cor = marcada ? Marcada : l.Escolhivel ? Tinta : TintaFraca;
-                if (l.voltar) t.Poe(l.rotulo().ToUpperInvariant(), 62f, cor);
-                else if (l.valor == null) t.Poe(l.rotulo(), 40f, cor);
-                else t.Poe(l.rotulo().ToUpperInvariant() + "   <  " + l.valor().ToUpperInvariant() + "  >", 56f, cor);
+                if (l.voltar) t.Poe(l.rotulo().ToUpperInvariant(), 62f * K, cor);
+                else if (l.acao != null) t.Poe(l.rotulo().ToUpperInvariant(), 52f * K, cor);
+                else if (l.valor == null) t.Poe(l.rotulo(), 40f * K, cor);
+                else t.Poe(l.rotulo().ToUpperInvariant() + "   <  " + l.valor().ToUpperInvariant() + "  >", 56f * K, cor);
             }
         }
 
@@ -203,7 +239,7 @@ namespace BananaRoulette
                 {
                     Vector3 l = transform.InverseTransformPoint(raio.GetPoint(dist));
                     int em = -1;
-                    if (Mathf.Abs(l.x) < Largura * 0.5f)
+                    if (Mathf.Abs(l.x) < larg * 0.5f)
                         for (int i = 0; i < linhas.Count; i++)
                             if (linhas[i].Escolhivel && Mathf.Abs(l.y - linhas[i].y) <= linhas[i].meiaAltura) em = i;
                     bool clique = rato.leftButton.wasPressedThisFrame;
@@ -232,9 +268,11 @@ namespace BananaRoulette
             if (linha < 0 || linha >= linhas.Count) return false;
             Linha l = linhas[linha];
             if (l.voltar) return true;
+            if (l.acao != null) { SomRetro.Tom(300f, 0.08f, "square", 0.05f); if (AoEscolher != null) AoEscolher(l.acao); return false; }
             if (l.muda == null) return false;
             sel = linha;
             l.muda(dir);
+            if (AoMudar != null) AoMudar();
             SomRetro.Tom(dir > 0 ? 660f : 440f, 0.06f, "square", 0.06f);
             Desenhar();
             return false;

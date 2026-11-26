@@ -26,7 +26,9 @@ namespace BananaRoulette
         public AberturaPlayer tocador;
         public Camera cam;
 
-        enum Modo { Espera, Carimbo, Titulo, Menu, Opcoes, Pagina, Creditos, Cena, Fim }
+        enum Modo { Espera, Carimbo, Titulo, Menu, Opcoes, Pagina, Personagem, Creditos, Cena, Fim }
+
+        [Serializable] class FrenteJ { public OpcJ[] normal; public OpcJ[] primeira; }
 
         [Serializable] class CamJ { public string nome; public float[] p; public float[] o; public float f = 32f; }
         [Serializable] class OpcJ { public string nome; public float[] r; }
@@ -77,7 +79,16 @@ namespace BananaRoulette
             texLisa = Resources.Load<Texture2D>("Abertura/tampa-lisa");
             texTampa[0] = Resources.Load<Texture2D>("Abertura/tampa-estudio");
             texTampa[1] = Resources.Load<Texture2D>("Abertura/tampa-estudio-en");
-            texFrente[1] = Resources.Load<Texture2D>("Abertura/menu-frente-en");
+            // Frente do caixote: quem nunca jogou ve o TUTORIAL logo abaixo do JOGAR; depois ele desce para o lado do PERSONAGEM.
+            string arrumacao = GameSettings.Played ? "normal" : "primeira";
+            var frente = Resources.Load<TextAsset>("Abertura/menu-frente");
+            if (frente != null)
+            {
+                var f = JsonUtility.FromJson<FrenteJ>(frente.text);
+                d.menu = GameSettings.Played ? f.normal : f.primeira;
+            }
+            texFrente[0] = Resources.Load<Texture2D>("Abertura/menu-frente-" + arrumacao + "-pt");
+            texFrente[1] = Resources.Load<Texture2D>("Abertura/menu-frente-" + arrumacao + "-en");
             texOpcoes[1] = Resources.Load<Texture2D>("Abertura/menu-opcoes-en");
             texLateral[1] = Resources.Load<Texture2D>("Abertura/menu-lateral-en");
             texCreditos[0] = Resources.Load<Texture2D>("Abertura/creditos-chao");
@@ -120,7 +131,14 @@ namespace BananaRoulette
                 {
                     if (m == null) continue;
                     if (m.name.StartsWith("TampaEstudio")) matTampa = m;
-                    else if (m.name.StartsWith("MenuFrente")) { matFrente = m; texFrente[0] = LeTextura(m); }
+                    else if (m.name.StartsWith("MenuFrente"))
+                    {
+                        matFrente = m; if (texFrente[0] == null) texFrente[0] = LeTextura(m);
+                        var mf = r.GetComponent<MeshFilter>();
+                        float meia = mf != null && mf.sharedMesh != null ? mf.sharedMesh.bounds.extents.z : 0.17f;
+                        // texto de pe na frente do caixote: quem olha de frente ve a direita do texto no -X da peca
+                        if (paginaFrente == null) paginaFrente = PaginaOpcoes.Criar(r.transform, new Vector3(0f, 0f, meia + 0.03f), Quaternion.LookRotation(Vector3.back, Vector3.up), 1000f, 620f);
+                    }
                     else if (m.name.StartsWith("MenuOpcoes")) { matOpcoes = m; texOpcoes[0] = LeTextura(m); }
                     else if (m.name.StartsWith("MenuLateral")) { matLateral = m; texLateral[0] = LeTextura(m); }
                     else if (m.name.StartsWith("TampaPagina"))
@@ -285,7 +303,7 @@ namespace BananaRoulette
         }
 
         /// <summary>A pagina de opcoes aberta na tampa (nula antes de o menu ficar pronto). Serve para testar.</summary>
-        public PaginaOpcoes Pagina { get { return pagina; } }
+        public PaginaOpcoes Pagina { get { return modo == Modo.Personagem ? paginaFrente : pagina; } }
 
         // ------------------------------------------------------------------ entrada
 
@@ -349,6 +367,9 @@ namespace BananaRoulette
                     if (pagina == null) { if (qualquer) modo = origem; }
                     else if (pagina.Entrada(cam)) { pagina.Fechar(); modo = origem; }
                     break;
+                case Modo.Personagem:
+                    if (paginaFrente == null || paginaFrente.Entrada(cam)) FechaPersonagem();
+                    break;
                 case Modo.Creditos:
                     if (qualquer) modo = Modo.Menu;
                     break;
@@ -362,23 +383,97 @@ namespace BananaRoulette
         {
             if (nome == "jogar")
             {
-                // a camera sai do menu direto para dentro da cena: a abertura comeca do ponto em que ela se afasta
-                SomRetro.Ruido(0.5f, 0.2f, 500f, "bandpass");
-                jaCarimbou = true;
-                PoeTextura(matTampa, texEstudio);
-                tocador.MisturarDe(cam.transform.position, cam.transform.rotation, cam.fieldOfView);
-                tocador.controlaCamera = true;
-                tocador.TocarDe(0.3f);
-                modo = Modo.Cena;
+                // Primeira vez: antes de jogar, pergunta se quer o tutorial (na tampa do caixote de tras).
+                if (!GameSettings.Played && pagina != null)
+                {
+                    SomRetro.Tom(300f, 0.08f, "square", 0.05f);
+                    PoeTextura(matPagina, texLisa);
+                    pagina.AoEscolher = resposta =>
+                    {
+                        GameSettings.SetPlayed(true);
+                        pagina.Fechar();
+                        if (resposta == "tutorial") IrPara(AppEntry.Screen.Tutorial);
+                        else ComecaAbertura();
+                    };
+                    pagina.Abrir("primeira");
+                    perguntando = true;
+                    origem = Modo.Menu; modo = Modo.Pagina;
+                }
+                else ComecaAbertura();
             }
-            else if (nome == "tutorial") { SomRetro.Tom(300f, 0.08f, "square", 0.05f); IrPara(AppEntry.Screen.Tutorial); }
+            else if (nome == "personagem") AbrePersonagem();
+            else if (nome == "tutorial") { SomRetro.Tom(300f, 0.08f, "square", 0.05f); GameSettings.SetPlayed(true); IrPara(AppEntry.Screen.Tutorial); }
             else if (nome == "opcoes") { SomRetro.Tom(300f, 0.08f, "square", 0.05f); modo = Modo.Opcoes; }
             else if (nome == "creditos") { SomRetro.Tom(300f, 0.08f, "square", 0.05f); modo = Modo.Creditos; }
+        }
+
+        // A camera sai de onde esta direto para dentro da cena: a abertura comeca do ponto em que ela se afasta.
+        void ComecaAbertura()
+        {
+            SomRetro.Ruido(0.5f, 0.2f, 500f, "bandpass");
+            jaCarimbou = true;
+            PoeTextura(matTampa, texEstudio);
+            tocador.MisturarDe(cam.transform.position, cam.transform.rotation, cam.fieldOfView);
+            tocador.controlaCamera = true;
+            tocador.TocarDe(0.3f);
+            modo = Modo.Cena;
+        }
+
+        // ------------------------------------------------------------------ personagem
+
+        // Onde o macaco de mostra fica (ao lado do caixote de tras) e de onde a camera olha os dois.
+        static readonly Vector3 LugarDoMacaco = new Vector3(-1.2f, 0f, 6.6f);
+        const float EscalaDaMostra = 0.55f;
+        PaginaOpcoes paginaFrente; // as escolhas ficam escritas na frente do caixote do menu, de pe, ao lado do macaco
+        static readonly Vector3 CamPersonagemP = new Vector3(5.5f, 5.4f, 25f), CamPersonagemO = new Vector3(6.2f, 4.4f, 1f);
+        const float CamPersonagemF = 34f;
+
+        MacacoVisual mostra;
+        bool perguntando; // a pagina aberta e o aviso de primeira vez, nao uma pagina de opcoes
+        GameObject bombaMostra;
+
+        void AbrePersonagem()
+        {
+            if (paginaFrente == null) return;
+            SomRetro.Tom(300f, 0.08f, "square", 0.05f);
+            PoeTextura(matFrente, texLisa); // a frente do caixote fica lisa enquanto as escolhas estao escritas nela
+            if (mostra == null)
+            {
+                var lugar = new GameObject("Macaco de mostra");
+                lugar.transform.position = LugarDoMacaco;
+                lugar.transform.rotation = Quaternion.LookRotation(new Vector3(CamPersonagemP.x - LugarDoMacaco.x, 0f, CamPersonagemP.z - LugarDoMacaco.z));
+                mostra = MacacoVisual.Criar(lugar.transform, Vector3.zero, EscalaDaMostra, Aparencia.Pelo(GameSettings.Fur).cor);
+                var modeloBomba = Resources.Load<GameObject>("Jogo/maco-jogo");
+                if (modeloBomba != null) { bombaMostra = Instantiate(modeloBomba); bombaMostra.name = "Bomba de mostra"; bombaMostra.transform.localScale = Vector3.one * EscalaDaMostra; VisualRetro.Converter(bombaMostra); }
+            }
+            if (mostra != null) { mostra.transform.parent.gameObject.SetActive(true); mostra.Laco("segura1"); }
+            if (bombaMostra != null) bombaMostra.SetActive(true);
+            VesteMostra();
+            paginaFrente.AoMudar = VesteMostra;
+            paginaFrente.Abrir("personagem");
+            modo = Modo.Personagem;
+        }
+
+        void VesteMostra()
+        {
+            Aparencia.VestirJogador(mostra);
+            Aparencia.PintaBomba(bombaMostra, GameSettings.Bomb);
+        }
+
+        void FechaPersonagem()
+        {
+            paginaFrente.AoMudar = null;
+            paginaFrente.Fechar();
+            AplicaIdioma(); // devolve a pintura do menu a frente do caixote
+            if (mostra != null) mostra.transform.parent.gameObject.SetActive(false);
+            if (bombaMostra != null) bombaMostra.SetActive(false);
+            modo = Modo.Menu;
         }
 
         void AbrePagina(string nome)
         {
             // a tampa fica lisa e a pagina e escrita por cima, ligada aos ajustes de verdade
+            perguntando = false;
             if (pagina != null) { PoeTextura(matPagina, texLisa); pagina.Abrir(nome); }
             else PoeTextura(matPagina, Resources.Load<Texture2D>("Abertura/pagina-" + nome));
             origem = Modo.Opcoes; modo = Modo.Pagina;
@@ -460,8 +555,15 @@ namespace BananaRoulette
                 return;
             }
 
-            CamJ c = Cam(NomeDaCam());
             float a = 1f - Mathf.Exp(-dt * (modo == Modo.Titulo && relogio < 7.5f ? 2.4f : 4.2f));
+            if (modo == Modo.Personagem)
+            {
+                camPos = Vector3.Lerp(camPos, CamPersonagemP, a);
+                camOlhar = Vector3.Lerp(camOlhar, CamPersonagemO, a);
+                camFov = Mathf.Lerp(camFov, CamPersonagemF, a);
+                return;
+            }
+            CamJ c = Cam(NomeDaCam());
             camPos = Vector3.Lerp(camPos, V(c.p), a);
             camOlhar = Vector3.Lerp(camOlhar, V(c.o), a);
             camFov = Mathf.Lerp(camFov, c.f, a);
@@ -498,9 +600,9 @@ namespace BananaRoulette
             }
 
             // carimbo: vem de tras, paira, bate na tampa, segura, sobe e sai. A tinta aparece na batida
-            bool mostra = modo == Modo.Carimbo && r < 2.4f;
-            if (carimbo.gameObject.activeSelf != mostra) carimbo.gameObject.SetActive(mostra);
-            if (mostra)
+            bool comCarimbo = modo == Modo.Carimbo && r < 2.4f;
+            if (carimbo.gameObject.activeSelf != comCarimbo) carimbo.gameObject.SetActive(comCarimbo);
+            if (comCarimbo)
             {
                 float ch = Suave(Seg(r, 0.3f, 0.8f)), de = Mathf.Pow(Seg(r, 0.82f, 1f), 2f), so = Suave(Seg(r, 1.38f, 1.8f)), sa = Suave(Seg(r, 1.8f, 2.35f));
                 float alto = (1f - de) * (1f - so) + so, k = ch * (1f - sa);
@@ -524,6 +626,10 @@ namespace BananaRoulette
                 seta.localScale = frente ? Vector3.one : new Vector3(-1f, 1f, -1f);
             }
 
+            // a bomba de mostra acompanha a mao do macaco de mostra
+            if (modo == Modo.Personagem && bombaMostra != null && mostra != null && mostra.PontoMaco != null)
+                bombaMostra.transform.SetPositionAndRotation(mostra.PontoMaco.position, mostra.PontoMaco.rotation);
+
             // creditos no chao
             Color cc = matCreditos.color;
             cc.a = Mathf.Lerp(cc.a, modo == Modo.Creditos ? 1f : 0f, 1f - Mathf.Exp(-dt * 7f));
@@ -543,7 +649,10 @@ namespace BananaRoulette
                 case Modo.Titulo: return T("Clique ou aperte qualquer tecla", "Click or press any key");
                 case Modo.Menu: return T("Clique numa opção · ou setas e Enter", "Click an option · or arrows and Enter");
                 case Modo.Opcoes: return T("Clique numa opção · Esc volta", "Click an option · Esc goes back");
-                case Modo.Pagina: return T("Clique à esquerda ou à direita da linha para mudar · Esc volta", "Click left or right of the line to change · Esc goes back");
+                case Modo.Pagina:
+                    if (perguntando) return T("Clique numa resposta · Esc volta", "Click an answer · Esc goes back");
+                    goto case Modo.Personagem;
+                case Modo.Personagem: return T("Clique à esquerda ou à direita da linha para mudar · Esc volta", "Click left or right of the line to change · Esc goes back");
                 case Modo.Creditos: return T("Clique para voltar", "Click to go back");
                 case Modo.Cena: return tocador.Tempo < 6f ? T("Enter pula a abertura", "Enter skips the intro") : "";
                 default: return "";

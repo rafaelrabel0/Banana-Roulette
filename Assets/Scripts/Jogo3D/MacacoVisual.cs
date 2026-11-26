@@ -47,6 +47,23 @@ namespace BananaRoulette
 
         public Transform PontoMaco { get; private set; }
 
+        readonly List<Transform> acessorios = new List<Transform>();
+
+        /// <summary>
+        /// Liga os acessorios escolhidos e desliga os outros. Cada um e o fim do nome do grupo no modelo
+        /// (ex.: "palha" liga Ac_chapeu_palha). Vazio = nenhum naquele lugar.
+        /// </summary>
+        public void Vestir(string chapeu, string oculos, string brinco)
+        {
+            foreach (Transform t in acessorios)
+            {
+                bool liga = (chapeu != "" && t.name.StartsWith("Ac_chapeu_" + chapeu)) ||
+                            (oculos != "" && t.name.StartsWith("Ac_oculos_" + oculos)) ||
+                            (brinco != "" && t.name.StartsWith("Ac_brinco_" + brinco));
+                if (t.gameObject.activeSelf != liga) t.gameObject.SetActive(liga);
+            }
+        }
+
         static void Carrega()
         {
             if (modelo != null) return;
@@ -90,7 +107,11 @@ namespace BananaRoulette
             }
 
             foreach (Transform t in GetComponentsInChildren<Transform>(true))
+            {
                 if (t.name.StartsWith("PontoMaco")) PontoMaco = t;
+                else if (t.name.StartsWith("Ac_")) acessorios.Add(t);
+            }
+            Vestir("", "", ""); // nasce sem nada na cabeca
 
             // Cada macaco ganha copias dos materiais, para ter a propria cor de pelo e poder tostar sozinho.
             var copias = new Dictionary<Material, Material>();

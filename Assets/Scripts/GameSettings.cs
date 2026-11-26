@@ -18,6 +18,12 @@ namespace BananaRoulette
         private const string KeyLetters = "br_letters";
         private const string KeyPixel = "br_pixel";
         private const string KeyWobble = "br_wobble";
+        private const string KeyPlayed = "br_played";
+        private const string KeyFur = "br_fur";
+        private const string KeyHat = "br_hat";
+        private const string KeyGlasses = "br_glasses";
+        private const string KeyEarring = "br_earring";
+        private const string KeyBomb = "br_bomb";
 
         public static float MusicVolume { get; private set; }
         public static float SfxVolume { get; private set; }
@@ -28,6 +34,16 @@ namespace BananaRoulette
 
         /// <summary>Visual retro: imagem em poucas linhas (pixel aparente).</summary>
         public static bool Pixel { get; private set; } = true;
+
+        /// <summary>Falso ate o jogador responder ao aviso de primeira vez (ou terminar o tutorial).</summary>
+        public static bool Played { get; private set; }
+
+        // Personalizacao: posicao de cada escolha nas listas de Aparencia.
+        public static int Fur { get; private set; }
+        public static int Hat { get; private set; }
+        public static int Glasses { get; private set; }
+        public static int Earring { get; private set; }
+        public static int Bomb { get; private set; }
 
         /// <summary>Visual retro: tremor dos vertices.</summary>
         public static bool Wobble { get; private set; } = true;
@@ -45,6 +61,12 @@ namespace BananaRoulette
             UseLetters = PlayerPrefs.GetInt(KeyLetters, 0) == 1;
             Pixel = PlayerPrefs.GetInt(KeyPixel, 1) == 1;
             Wobble = PlayerPrefs.GetInt(KeyWobble, 1) == 1;
+            Played = PlayerPrefs.GetInt(KeyPlayed, 0) == 1;
+            Fur = PlayerPrefs.GetInt(KeyFur, 0);
+            Hat = PlayerPrefs.GetInt(KeyHat, 0);
+            Glasses = PlayerPrefs.GetInt(KeyGlasses, 0);
+            Earring = PlayerPrefs.GetInt(KeyEarring, 0);
+            Bomb = PlayerPrefs.GetInt(KeyBomb, 0);
             VisualRetro.Pixel = Pixel;
             VisualRetro.Tremor = Wobble;
 
@@ -94,6 +116,19 @@ namespace BananaRoulette
                 int target = Mathf.RoundToInt(Quality / 2f * (count - 1));
                 QualitySettings.SetQualityLevel(target, true);
             }
+        }
+
+        public static void SetPlayed(bool value) { Played = value; Guarda(KeyPlayed, value ? 1 : 0); }
+        public static void SetFur(int value) { Fur = value; Guarda(KeyFur, value); }
+        public static void SetHat(int value) { Hat = value; Guarda(KeyHat, value); }
+        public static void SetGlasses(int value) { Glasses = value; Guarda(KeyGlasses, value); }
+        public static void SetEarring(int value) { Earring = value; Guarda(KeyEarring, value); }
+        public static void SetBomb(int value) { Bomb = value; Guarda(KeyBomb, value); }
+
+        private static void Guarda(string chave, int valor)
+        {
+            PlayerPrefs.SetInt(chave, valor);
+            PlayerPrefs.Save();
         }
 
         public static void SetUseLetters(bool value)
