@@ -40,6 +40,9 @@ namespace BananaRoulette
         /// <summary>Quanto o mundo da previa encolhe para caber na roda do jogo.</summary>
         // Na previa a roda tem raio 15 e os macacos quase se encostam. Aqui a roda fica um terco mais folgada,
         // para o centro ficar livre e a bomba aparecer por cima da cabeca do jogador.
+        private Transform _faceDoMenu;   // tabua da frente do caixote de dinamite, onde o menu da partida e escrito
+        private float _meiaFace = 0.17f;
+
         private float Escala { get { return config.circleRadius / (MacacoVisual.RaioDaPrevia * 1.33f); } }
 
         private void Start()
@@ -84,6 +87,13 @@ namespace BananaRoulette
                 case AppEntry.Screen.Game:
                     _manager = gameObject.AddComponent<GameManager>();
                     _manager.Setup(config, slots, solvers, _banana, _hud, fuse, shake, flash);
+                    if (usar3D && _faceDoMenu != null)
+                    {
+                        var gerente = _manager;
+                        PausaNoCaixote.Criar(camera, _faceDoMenu, _meiaFace, _canvas.transform, _hud,
+                            () => gerente.BombaComJogador, () => AppEntry.GoTo(AppEntry.Screen.Menu));
+                        _manager.TemMenuDaPartida = true;
+                    }
                     _manager.StartMatch();
                     break;
 
@@ -185,6 +195,20 @@ namespace BananaRoulette
                         t.gameObject.SetActive(false);
                 }
                 VisualRetro.Converter(copia);
+
+                // a frente do caixote de dinamite fica lisa: e nela que o menu da partida e escrito
+                var lisa = Resources.Load<Texture2D>("Abertura/tampa-lisa");
+                foreach (Renderer r in copia.GetComponentsInChildren<Renderer>(true))
+                {
+                    foreach (Material m in r.sharedMaterials)
+                    {
+                        if (m == null || !m.name.StartsWith("MenuFrente")) continue;
+                        _faceDoMenu = r.transform;
+                        var mf = r.GetComponent<MeshFilter>();
+                        if (mf != null && mf.sharedMesh != null) _meiaFace = mf.sharedMesh.bounds.extents.z;
+                        if (lisa != null && m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", lisa);
+                    }
+                }
             }
 
             float e = Escala;

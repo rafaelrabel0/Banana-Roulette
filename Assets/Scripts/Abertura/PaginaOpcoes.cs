@@ -53,7 +53,7 @@ namespace BananaRoulette
         }
 
         readonly List<Risco> textos = new List<Risco>();
-        Func<string> titulo;
+        Func<string> titulo, rotuloVoltar;
         Risco textoTitulo;
         int sel;
 
@@ -109,6 +109,7 @@ namespace BananaRoulette
         public void Abrir(string nome)
         {
             linhas.Clear();
+            rotuloVoltar = () => Loc.Get("set.back");
             switch (nome)
             {
                 case "som":
@@ -142,6 +143,15 @@ namespace BananaRoulette
                     Add(() => T("Brinco", "Earring"), () => Aparencia.Brinco(GameSettings.Earring).Nome, dir => GameSettings.SetEarring(Roda(GameSettings.Earring + dir, Aparencia.Brincos.Length)));
                     Add(() => T("Bomba", "Bomb"), () => Aparencia.Bomba(GameSettings.Bomb).Nome, dir => GameSettings.SetBomb(Roda(GameSettings.Bomb + dir, Aparencia.Bombas.Length)));
                     break;
+                case "pausa":
+                    // menu da partida, escrito no caixote ao lado da roda. A partida continua correndo.
+                    titulo = () => "MENU";
+                    Volume(() => Loc.Get("set.sfx"), () => GameSettings.SfxVolume, GameSettings.SetSfx);
+                    Add(() => T("Teclas", "Keys"), () => GameSettings.UseLetters ? T("LETRAS (W A S D)", "LETTERS (W A S D)") : T("SETAS", "ARROWS"),
+                        dir => GameSettings.SetUseLetters(!GameSettings.UseLetters));
+                    linhas.Add(new Linha { rotulo = () => T("Sair da partida", "Leave the match"), acao = "sair" });
+                    rotuloVoltar = () => T("Voltar ao jogo", "Back to the game");
+                    break;
                 case "primeira":
                     titulo = () => T("PRIMEIRA VEZ?", "FIRST TIME?");
                     Aviso(() => T("Esta é a sua primeira vez jogando Banana Roulette.", "This is your first time playing Banana Roulette."));
@@ -162,7 +172,7 @@ namespace BananaRoulette
                     Aviso(() => T("Esc: voltar ao menu", "Esc: back to menu"));
                     break;
             }
-            linhas.Add(new Linha { rotulo = () => Loc.Get("set.back"), voltar = true });
+            linhas.Add(new Linha { rotulo = () => rotuloVoltar(), voltar = true });
 
             // espalha as linhas pela tampa, abaixo do titulo
             float topo = 160f * K, pe = -285f * K;

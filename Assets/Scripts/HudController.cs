@@ -108,6 +108,13 @@ namespace BananaRoulette
         /// Na partida em 3D a fila de setas sobe para o meio da roda, que fica vazio:
         /// no lugar antigo ela tapava a bomba na mao do jogador.
         /// </summary>
+        /// <summary>Esconde ou mostra a fila de setas (o menu da partida esconde enquanto esta aberto).</summary>
+        public void SetKeysVisible(bool visible)
+        {
+            if (_keyRow != null) _keyRow.gameObject.SetActive(visible);
+            if (_hintText != null) _hintText.gameObject.SetActive(visible);
+        }
+
         public void Layout3D()
         {
             if (_keyRow != null) _keyRow.anchoredPosition = new Vector2(0f, 48f);

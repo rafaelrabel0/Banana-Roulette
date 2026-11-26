@@ -35,6 +35,7 @@ namespace BananaRoulette
         private void Update()
         {
             if (!IsActive) return;
+            if (PausaNoCaixote.Aberta) return; // com o menu da partida aberto, as teclas mexem no menu
             if (Time.time < _lockoutUntil) return;
 
             ArrowDirection pressed;

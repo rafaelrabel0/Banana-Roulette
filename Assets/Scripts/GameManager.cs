@@ -36,6 +36,19 @@ namespace BananaRoulette
         private bool _turnResolved;
         private ArrowDirection _chosenSide;
 
+        /// <summary>Ligado pelo bootstrap quando a partida tem o menu no caixote.</summary>
+        public bool TemMenuDaPartida;
+
+        /// <summary>Verdadeiro enquanto a bomba esta na mao do jogador humano e a rodada corre.</summary>
+        public bool BombaComJogador
+        {
+            get
+            {
+                if (!_running || _slots == null || _holderIndex < 0 || _holderIndex >= _slots.Count) return false;
+                return _slots[_holderIndex].IsHuman && _slots[_holderIndex].IsAlive && (Current == State.Holding || Current == State.Passing);
+            }
+        }
+
         public int AliveCount
         {
             get
@@ -114,7 +127,8 @@ namespace BananaRoulette
             var keyboard = Keyboard.current;
             if (keyboard == null) return;
 
-            if (keyboard.escapeKey.wasPressedThisFrame)
+            // Esc abre o menu da partida (PausaNoCaixote). Sem ele (greybox), Esc sai direto como antes.
+            if (keyboard.escapeKey.wasPressedThisFrame && !TemMenuDaPartida)
             {
                 AppEntry.GoTo(AppEntry.Screen.Menu);
                 return;

@@ -40,6 +40,12 @@ namespace BananaRoulette
         private bool _passed;
         private ArrowDirection _chosenSide;
         private int _progress;
+        private bool _lendo;   // lendo as falas antes de jogar: o pavio para em um terco
+        private bool _naVez;   // digitando a sequencia: o pavio nao chega ao fim
+
+        static string T(string pt, string en) { return Loc.Current == Language.Portuguese ? pt : en; }
+        static string Teclas { get { return GameSettings.UseLetters ? "W A S D" : T("as setas", "the arrow keys"); } }
+        static string Lados { get { return GameSettings.UseLetters ? "A / D" : T("seta para a esquerda ou para a direita", "left or right arrow"); } }
 
         public void Setup(TuningConfig config, List<MonkeySlot> slots, List<TurnSolver> solvers,
             BananaCarrier banana, HudController hud, FuseTimer fuse, CameraShake shake,
@@ -65,13 +71,14 @@ namespace BananaRoulette
         private void BuildUi(Transform canvas)
         {
             _speechBox = UiFactory.CreatePanel(canvas, "TutorialBox", new Color(0.02f, 0.09f, 0.06f, 0.94f));
-            UiFactory.Anchor(_speechBox, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0.5f, 0f), new Vector2(0f, 64f), new Vector2(1520f, 148f));
+            // no topo, logo abaixo do pavio: e para la que a fala aponta
+            UiFactory.Anchor(_speechBox, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f), new Vector2(0f, -196f), new Vector2(1520f, 186f));
 
-            _speech = UiFactory.CreateText(_speechBox.transform, "Speech", "", 33,
+            _speech = UiFactory.CreateText(_speechBox.transform, "Speech", "", 31,
                 TextAnchor.MiddleCenter, Color.white);
             UiFactory.Anchor(_speech, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 12f), new Vector2(1420f, 94f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 16f), new Vector2(1440f, 126f));
             _speech.horizontalOverflow = HorizontalWrapMode.Wrap;
 
             _prompt = UiFactory.CreateText(_speechBox.transform, "Prompt", "", 23,
@@ -146,6 +153,12 @@ namespace BananaRoulette
 
                 _banana.UpdateFuseVisual(burned);
                 if (_hud != null && _hud.TopFuse != null) _hud.TopFuse.SetProgress(burned);
+                MonkeySlot.Tensao = burned;
+
+                // Enquanto ele le, o pavio queima de verdade, mas para em um terco: tem de sobrar tempo para jogar.
+                if (_lendo && _fuse.IsRunning && _fuse.BurnedFraction >= 1f / 3f) _fuse.Stop();
+                // E na vez dele o pavio nunca chega ao fim: aqui e para aprender, nao para perder.
+                if (_naVez && _fuse.IsRunning && _fuse.Remaining < 4f) _fuse.Stop();
             }
 
             if (_prompt != null && !string.IsNullOrEmpty(_prompt.text))
@@ -165,50 +178,48 @@ namespace BananaRoulette
             _hud.SetAliveCount(_slots.Count, _config.monkeyCount);
             _hud.SetEscHint("");
 
-            _holderIndex = 0; // comeca na mao do jogador
+            // Continuacao da abertura: a bomba cai do alto na mao do jogador, ele se assusta e comeca o malabarismo.
+            _holderIndex = 0;
+            _speechBox.gameObject.SetActive(false);
+            _banana.transform.position = _slots[0].HandPosition + Vector3.up * 14f;
+            _slots[0].Receber();
+            yield return _banana.FlyTo(_slots[0], 0.45f);
             _banana.SnapTo(_slots[0]);
             _slots[0].SetHolding(true);
-            _fuse.StartFuse(999f);
-            _fuse.Stop();
+            _speechBox.gameObject.SetActive(true);
 
-            yield return Say("tut.1");
-            yield return Say("tut.2");
-            yield return Say("tut.3");
-
-            // ---- Rodada 1: o jogador digita e passa ----
-            _fuse.StartFuse(20f);
+            // O pavio ja comeca a queimar enquanto ele le (e para em um terco, ver Update).
+            _fuse.StartFuse(48f);
             if (_hud.TopFuse != null) _hud.TopFuse.ResetFuse();
-            yield return PlayerTurn("tut.4", 3, false);
+            _lendo = true;
+
+            yield return SayText(T("Rápido! Você é um macaco e uma bomba caiu no seu colo. Seja ágil e aperte os comandos a tempo para jogar a bomba para o macaco ao lado.",
+                                   "Quick! You are a monkey and a bomb just landed in your lap. Be fast and press the commands in time to throw the bomb to the monkey next to you."));
+            yield return SayText(T("Este cordão aqui em cima é o pavio da bomba. Ele está queimando agora mesmo. Quanto mais você demora, menos pavio sobra.",
+                                   "This cord up here is the bomb's fuse. It is burning right now. The longer you take, the less fuse is left."));
+            yield return SayText(T("Cada erro queima um pedaço do pavio de uma vez. Erre muitas vezes e a bomba explode na sua mão.",
+                                   "Each mistake burns a chunk of the fuse at once. Miss too many times and the bomb blows up in your hands."));
+            yield return SayText(T("No meio da roda vai aparecer uma fila de teclas. Aperte uma por uma, da esquerda para a direita, usando " + Teclas + ".",
+                                   "A row of keys will show up in the middle of the circle. Press them one by one, left to right, using " + Teclas + "."));
+
+            // ---- A vez do jogador: digitar a sequencia e arremessar ----
+            _lendo = false;
+            _fuse.Resume();
+            _naVez = true;
+            yield return PlayerTurn(null, 3, false);
+            _naVez = false;
 
             _fuse.Stop();
-            yield return Say("tut.6");
+            yield return SayText(T("Isso! A bomba agora é problema do vizinho. Ela continua passando de mão em mão, e o pavio não para.",
+                                   "That's it! The bomb is now your neighbour's problem. It keeps going from hand to hand, and the fuse never stops."));
             _fuse.Resume();
 
             // ---- Os bots jogam ate o pavio acabar na mao de um deles ----
             yield return BotsPlayUntilBoom();
 
-            yield return Say("tut.7");
-            yield return Say("tut.8");
-
-            // ---- Rodada 2: pavio novo, mais curto, e o erro de proposito ----
-            _holderIndex = 0;
-            _banana.gameObject.SetActive(true);
-            _banana.SnapTo(_slots[0]);
-            _slots[0].SetHolding(true);
-            _fuse.StartFuse(26f);
-            if (_hud.TopFuse != null) _hud.TopFuse.ResetFuse();
-
-            yield return PlayerTurn("tut.9", 4, true);
-
-            _fuse.Stop();
-            yield return Say("tut.10");
-            yield return Say("tut.11");
-            _fuse.Resume();
-
-            yield return PlayerTurn("tut.12", 4, false);
-
-            _fuse.Stop();
-            yield return Say("tut.13", false);
+            yield return SayText(T("Quando o pavio acaba, quem está com a bomba explode e sai da roda. Depois de cada explosão o pavio fica mais curto e a fila de teclas, mais comprida.",
+                                   "When the fuse runs out, whoever holds the bomb blows up and leaves the circle. After each explosion the fuse gets shorter and the row of keys gets longer."));
+            SpeakText(T("O último macaco na roda vence. Boa sorte!", "The last monkey in the circle wins. Good luck!"));
 
             _hud.ClearTurnVisuals();
             _hud.SetStatus("", Color.white);
@@ -228,7 +239,8 @@ namespace BananaRoulette
 
             var sequence = SequenceGenerator.Generate(length);
 
-            Speak(speechKey);
+            if (speechKey != null) Speak(speechKey);
+            else SpeakText(T("Sua vez! Aperte a primeira tecla da fila, a que está amarela.", "Your turn! Press the first key in the row, the yellow one."));
             _prompt.text = "";
             _hud.SetStatus(Loc.Get("game.yourturn"), Palette.BananaYellow);
             _hud.ShowSequence(sequence, false);
@@ -242,6 +254,9 @@ namespace BananaRoulette
             {
                 _progress = progress;
                 _hud.RegisterHit(progress);
+                _slots[0].Acertou();
+                if (speechKey == null && progress < length)
+                    SpeakText(T("Boa! Agora a próxima. Faltam " + (length - progress) + ".", "Nice! Now the next one. " + (length - progress) + " to go."));
 
                 // No passo do erro, acertar nao serve: pede de novo.
                 if (requireMiss && !_missedThisStep) Speak("tut.wrongonpurpose");
@@ -251,6 +266,8 @@ namespace BananaRoulette
                 _missedThisStep = true;
                 _progress = 0;
                 OnMiss();
+                if (speechKey == null)
+                    SpeakText(T("Errou a tecla! Olhe lá em cima: o pavio queimou um pedaço. A fila recomeça do início.", "Wrong key! Look up there: the fuse burned a chunk. The row starts over."));
             };
             solver.OnPassChosen += side => { _chosenSide = side; _passed = true; };
 
@@ -284,7 +301,8 @@ namespace BananaRoulette
             {
                 if (!hintShown && solver.IsChoosingSide)
                 {
-                    Speak("tut.5");
+                    if (speechKey != null) Speak("tut.5");
+                    else SpeakText(T("Fila completa! Agora escolha para quem jogar: " + Lados + ".", "Row complete! Now pick who gets it: " + Lados + "."));
                     _hud.ShowSideChoice(true);
                     hintShown = true;
                 }
@@ -337,6 +355,8 @@ namespace BananaRoulette
         private IEnumerator PassTo(int target)
         {
             _slots[_holderIndex].SetHolding(false);
+            _slots[_holderIndex].Arremessar(_slots[target].transform.position);
+            _slots[target].Receber();
             _holderIndex = target;
             _slots[target].SetHolding(true);
             _hud.ClearTurnVisuals();
@@ -409,6 +429,25 @@ namespace BananaRoulette
         private void Speak(string key)
         {
             _speech.text = Loc.Get(key);
+        }
+
+        private void SpeakText(string text)
+        {
+            _speech.text = text;
+        }
+
+        private IEnumerator SayText(string text)
+        {
+            SpeakText(text);
+            _prompt.text = Loc.Get("tut.next");
+            yield return null; // evita consumir o mesmo toque duas vezes seguidas
+            var keyboard = Keyboard.current;
+            while (keyboard == null || !keyboard.spaceKey.wasPressedThisFrame)
+            {
+                keyboard = Keyboard.current;
+                yield return null;
+            }
+            _prompt.text = "";
         }
 
         private IEnumerator Say(string key, bool waitForSpace = true)
