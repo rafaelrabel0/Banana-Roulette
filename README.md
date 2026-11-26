@@ -98,29 +98,48 @@ peças e 41 s de movimento.
 | `Assets/Scripts/Abertura/AberturaPlayer.cs` | Toca a cena e move a câmera |
 | `Assets/Editor/MontaAbertura.cs` | Menu que monta a cena sozinho |
 
-### Como ver
+### Como ver e jogar
 
 1. Abra o projeto. Na primeira vez a Unity baixa o pacote **glTFast** (`com.unity.cloud.gltfast`),
    que é quem sabe ler `.glb`.
-2. No menu de cima: **Banana Roulette → Montar cena de abertura**.
-3. Aparece o aviso "Cena criada em Assets/Scenes/Abertura.unity". Aperte **Play**.
+2. Na janela **Project**, abra `Assets/Scenes/Abertura.unity` (duplo clique) e aperte **Play**.
+3. Clique na tela: o carimbo bate na tampa, a câmera desce e o menu aparece no caixote da esquerda.
+4. **JOGAR** toca a abertura (41 s; **Enter** pula) e, no fim, abre a partida.
+   **TUTORIAL** abre o tutorial. **Esc** na partida volta ao menu.
 
+Se a cena não existir ou quebrar: menu de cima **Banana Roulette → Montar cena de abertura**.
 Se a cena aparecer de costas, selecione o objeto `Abertura` e desmarque
 **Girar Camera 180** no componente `Abertura Player`.
 
-### Visual retrô
+### As duas cenas
 
-Desde 26/11/2026 o padrão do jogo é o visual de poucos triângulos: formas angulares, faces
-chapadas, texturas de 64 pixels. **Os modelos e as texturas já vêm assim no `.glb`.** O que
-depende da Unity ainda não foi feito:
+| Cena | O que tem | Quem monta |
+|------|-----------|------------|
+| `Assets/Scenes/Abertura.unity` | Menu em 3D nos caixotes e a cena de abertura | `MenuAbertura` + `AberturaPlayer` |
+| `Assets/Scenes/Prototipo.unity` | A partida e o tutorial | `GameBootstrap`, por código |
 
-- desenhar a imagem com 320 linhas e ampliar sem suavizar (pixel aparente);
-- prender os vértices a uma grade na tela (o tremor).
+`AppEntry.GoTo(...)` troca de uma para a outra. As duas estão em **File → Build Profiles**,
+com a Abertura em primeiro. A regra do jogo não mudou: é a mesma do protótipo.
+
+### Menu 3D, som e visual retrô
+
+| Arquivo | O que faz |
+|---------|-----------|
+| `Assets/Scripts/Abertura/MenuAbertura.cs` | O menu: carimbo, câmera, clique nas opções pintadas, créditos no chão |
+| `Assets/Resources/Abertura/menu.json` | Posições de câmera e áreas de clique, exportadas da prévia |
+| `Assets/Resources/Abertura/*.png` | Tampa lisa e carimbada, páginas das opções, créditos |
+| `Assets/Scripts/Abertura/SomRetro.cs` | Som de rascunho fabricado por código (sem arquivo de áudio) |
+| `Assets/Scripts/Visual/VisualRetro.cs` | Pixel aparente (320 linhas) e troca dos materiais; entra sozinho em toda cena |
+| `Assets/Resources/Shaders/BananaRetro.shader` | Tremor dos vértices e faces chapadas, com a luz e a sombra da Unity |
+
+Teclas de teste: **F1** liga/desliga o pixel, **F2** liga/desliga o tremor.
 
 ### O que ainda não veio
 
-- O **traço de desenho** (sombra em degraus). O contorno preto veio, porque é malha; a
-  sombra em degraus depende de um shader que ainda não foi escrito para a URP.
-- O **menu** (carimbo, opções nos caixotes). Só a cena de abertura foi assada.
-- **Som**, **letreiro** e **balões com transparência suave**.
+- As **páginas de opções** nos caixotes são pintura: ainda não mudam nada. Com uma página
+  aberta, **Enter** abre a tela de ajustes de verdade (a do protótipo).
+- O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
+- A **partida** ainda é greybox (cápsulas); só ganhou o pixel aparente.
+- O **traço de desenho** (sombra em degraus) e **balões com transparência suave**.
+- Som e música de verdade: o que toca é rascunho sintetizado.
 - Otimização: são cerca de 5.400 objetos. Serve para ver, não para entregar.

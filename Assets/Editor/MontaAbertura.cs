@@ -93,6 +93,13 @@ namespace BananaRoulette.EditorTools
             cam.AddComponent<AudioListener>();
             tocador.cameraDaCena = c;
 
+            // Menu em 3D nos caixotes: ele segura a cena parada e so a solta quando o jogador escolhe JOGAR.
+            tocador.tocarAoIniciar = false;
+            MenuAbertura menu = raiz.GetComponent<MenuAbertura>();
+            if (menu == null) menu = raiz.AddComponent<MenuAbertura>();
+            menu.tocador = tocador;
+            menu.cam = c;
+
             // Sol. Na previa ele fica em (40, 70, 50) olhando para o centro; o importador espelha o eixo X.
             GameObject sol = new GameObject("Sol");
             Light luz = sol.AddComponent<Light>();
@@ -107,6 +114,7 @@ namespace BananaRoulette.EditorTools
 
             EditorSceneManager.SaveScene(cena, CaminhoCena);
             AssetDatabase.SaveAssets();
+            PoeNaListaDeBuild();
             Selection.activeGameObject = raiz;
 
             string aviso = tocador.noCamera == null
@@ -114,6 +122,17 @@ namespace BananaRoulette.EditorTools
                 : "";
             EditorUtility.DisplayDialog("Abertura",
                 "Cena criada em " + CaminhoCena + ".\n\nAperte Play para assistir." + aviso, "OK");
+        }
+
+        /// <summary>Poe a Abertura como primeira cena do jogo e a Prototipo logo depois (File > Build Profiles).</summary>
+        [MenuItem("Banana Roulette/Por as cenas na lista de build")]
+        public static void PoeNaListaDeBuild()
+        {
+            var lista = EditorBuildSettings.scenes.Where(c => c.path != CaminhoCena).ToList();
+            lista.Insert(0, new EditorBuildSettingsScene(CaminhoCena, true));
+            const string jogo = "Assets/Scenes/Prototipo.unity";
+            if (!lista.Any(c => c.path == jogo)) lista.Add(new EditorBuildSettingsScene(jogo, true));
+            EditorBuildSettings.scenes = lista.ToArray();
         }
     }
 }

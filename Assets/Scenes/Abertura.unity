@@ -5805,6 +5805,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 2107409826236812522, guid: 598ba3ceebf94469cb5ba1869bd9bb5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1789872014}
+    - targetCorrespondingSourceObject: {fileID: 2107409826236812522, guid: 598ba3ceebf94469cb5ba1869bd9bb5c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1789872016}
   m_SourcePrefab: {fileID: 3150474306388093854, guid: 598ba3ceebf94469cb5ba1869bd9bb5c, type: 3}
 --- !u!1 &1789872011 stripped
 GameObject:
@@ -5839,15 +5842,31 @@ MonoBehaviour:
   dados: {fileID: 4900000, guid: 68fbb7fa17be3a69d5a97b0d2ad9dda0, type: 3}
   cameraDaCena: {fileID: 983226603}
   noCamera: {fileID: 1789872012}
-  tocarAoIniciar: 1
+  tocarAoIniciar: 0
   repetir: 0
   girarCamera180: 1
   velocidade: 1
+  controlaCamera: 1
+  comSom: 1
   nevoaInicio: 125
   nevoaFim: 340
   aoTerminar:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &1789872016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1789872011}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 488c258cba5b6d24193530b7bb74c171, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BananaRoulette.MenuAbertura
+  tocador: {fileID: 1789872014}
+  cam: {fileID: 983226603}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
