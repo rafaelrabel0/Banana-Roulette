@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 namespace BananaRoulette
 {
     /// <summary>
     /// Pagina de opcoes escrita na tampa do caixote de tras, ligada aos ajustes de verdade (GameSettings).
     ///
-    /// E um Canvas deitado sobre a tampa. Cada linha mostra "ROTULO   < valor >":
+    /// E um plano deitado sobre a tampa, escrito com a mesma letra de estencil dos caixotes
+    /// (LetraEstencil). Cada linha mostra "ROTULO   < valor >":
     ///   - clique na metade esquerda da linha diminui, na direita aumenta;
     ///   - setas para cima/baixo escolhem a linha, esquerda/direita mudam o valor;
     ///   - VOLTAR (ou Esc) fecha.
@@ -34,9 +34,22 @@ namespace BananaRoulette
         }
 
         readonly List<Linha> linhas = new List<Linha>();
-        readonly List<Text> textos = new List<Text>();
+        // Uma linha de texto em 3D: so refaz a malha quando o texto, o tamanho ou a cor mudam.
+        class Risco
+        {
+            public Transform t; public UnityEngine.Mesh malha; public MeshRenderer r;
+            string texto; float tamanho; Color cor;
+            public void Poe(string novo, float tam, Color c)
+            {
+                if (novo == texto && tam == tamanho && c == cor) return;
+                texto = novo; tamanho = tam; cor = c;
+                LetraEstencil.Escreve(malha, novo, tam, c, Largura - 90f);
+            }
+        }
+
+        readonly List<Risco> textos = new List<Risco>();
         Func<string> titulo;
-        Text textoTitulo;
+        Risco textoTitulo;
         int sel;
 
         public bool Aberta { get; private set; }
@@ -48,30 +61,30 @@ namespace BananaRoulette
         /// <summary>Cria a pagina deitada sobre a tampa. meiaEspessura = metade da grossura da tampa.</summary>
         public static PaginaOpcoes Criar(Transform tampa, float meiaEspessura)
         {
-            var go = new GameObject("Pagina de opcoes", typeof(Canvas));
+            var go = new GameObject("Pagina de opcoes");
             go.transform.SetParent(tampa, false);
             go.transform.localPosition = new Vector3(0f, meiaEspessura + 0.03f, 0f);
             // letras de pe para quem olha da camera da pagina: "cima" do texto aponta para o fundo do caixote
             go.transform.localRotation = Quaternion.LookRotation(Vector3.down, Vector3.back);
             go.transform.localScale = Vector3.one * Escala;
-            var canvas = go.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            ((RectTransform)go.transform).sizeDelta = new Vector2(Largura, Altura);
-
             var p = go.AddComponent<PaginaOpcoes>();
-            p.textoTitulo = p.NovoTexto("Titulo", 74, FontStyle.Bold);
-            p.textoTitulo.rectTransform.anchoredPosition = new Vector2(0f, 285f);
-            for (int i = 0; i < 6; i++) p.textos.Add(p.NovoTexto("Linha " + i, 54, FontStyle.Bold));
+            p.textoTitulo = p.NovoTexto("Titulo");
+            p.textoTitulo.t.localPosition = new Vector3(0f, 285f, 0f);
+            for (int i = 0; i < 6; i++) p.textos.Add(p.NovoTexto("Linha " + i));
             go.SetActive(false);
             return p;
         }
 
-        Text NovoTexto(string nome, int tamanho, FontStyle estilo)
+        Risco NovoTexto(string nome)
         {
-            Text t = UiFactory.CreateText(transform, nome, "", tamanho, TextAnchor.MiddleCenter, Tinta);
-            t.fontStyle = estilo;
-            t.rectTransform.sizeDelta = new Vector2(Largura - 60f, 90f);
-            return t;
+            var go = new GameObject(nome, typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(transform, false);
+            var r = new Risco { t = go.transform, malha = new UnityEngine.Mesh(), r = go.GetComponent<MeshRenderer>() };
+            go.GetComponent<MeshFilter>().sharedMesh = r.malha;
+            r.r.sharedMaterial = LetraEstencil.Material;
+            r.r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.r.receiveShadows = false;
+            return r;
         }
 
         // ------------------------------------------------------------------ conteudo
@@ -143,20 +156,20 @@ namespace BananaRoulette
 
         void Desenhar()
         {
-            textoTitulo.text = titulo().ToUpperInvariant();
+            textoTitulo.Poe(titulo().ToUpperInvariant(), 80f, Tinta);
             for (int i = 0; i < textos.Count; i++)
             {
-                Text t = textos[i];
+                Risco t = textos[i];
                 bool tem = i < linhas.Count;
-                t.enabled = tem;
+                t.r.enabled = tem;
                 if (!tem) continue;
                 Linha l = linhas[i];
-                t.rectTransform.anchoredPosition = new Vector2(0f, l.y);
+                t.t.localPosition = new Vector3(0f, l.y, 0f);
                 bool marcada = i == sel && l.Escolhivel;
-                if (l.voltar) { t.fontSize = 60; t.text = l.rotulo().ToUpperInvariant(); }
-                else if (l.valor == null) { t.fontSize = 38; t.text = l.rotulo(); }
-                else { t.fontSize = 52; t.text = l.rotulo().ToUpperInvariant() + "     <  " + l.valor().ToUpperInvariant() + "  >"; }
-                t.color = marcada ? Marcada : l.Escolhivel ? Tinta : TintaFraca;
+                Color cor = marcada ? Marcada : l.Escolhivel ? Tinta : TintaFraca;
+                if (l.voltar) t.Poe(l.rotulo().ToUpperInvariant(), 62f, cor);
+                else if (l.valor == null) t.Poe(l.rotulo(), 40f, cor);
+                else t.Poe(l.rotulo().ToUpperInvariant() + "   <  " + l.valor().ToUpperInvariant() + "  >", 56f, cor);
             }
         }
 

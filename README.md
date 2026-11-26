@@ -129,6 +129,7 @@ com a Abertura em primeiro. A regra do jogo não mudou: é a mesma do protótipo
 | `Assets/Resources/Abertura/menu.json` | Posições de câmera e áreas de clique, exportadas da prévia |
 | `Assets/Resources/Abertura/*.png` | Tampa lisa e carimbada, páginas das opções, créditos |
 | `Assets/Scripts/Abertura/PaginaOpcoes.cs` | Páginas de opções escritas na tampa do caixote de trás, ligadas ao `GameSettings` |
+| `Assets/Scripts/Abertura/LetraEstencil.cs` | Escreve texto em 3D com a letra de estêncil dos caixotes (`letra-estencil.png` + `.json` em `Assets/Resources/Abertura`) |
 | `Assets/Scripts/Abertura/SomRetro.cs` | Som de rascunho fabricado por código (sem arquivo de áudio) |
 | `Assets/Scripts/Visual/VisualRetro.cs` | Pixel aparente (320 linhas) e troca dos materiais; entra sozinho em toda cena |
 | `Assets/Resources/Shaders/BananaRetro.shader` | Tremor dos vértices e faces chapadas, com a luz e a sombra da Unity |
@@ -142,7 +143,6 @@ W A S D). **Controles** só mostra as teclas. Tudo fica guardado entre uma sess�
 
 ### O que ainda não veio
 
-- As **páginas de opções** usam a fonte padrão da Unity, não a letra pintada dos caixotes.
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
 - A **partida** ainda é greybox (cápsulas); só ganhou o pixel aparente.
 - O **traço de desenho** (sombra em degraus) e **balões com transparência suave**.
