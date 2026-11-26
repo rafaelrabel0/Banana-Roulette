@@ -15,10 +15,22 @@ namespace BananaRoulette
         private const string KeyFullscreen = "br_fullscreen";
         private const string KeyQuality = "br_quality";
         private const string KeyLanguage = "br_language";
+        private const string KeyLetters = "br_letters";
+        private const string KeyPixel = "br_pixel";
+        private const string KeyWobble = "br_wobble";
 
         public static float MusicVolume { get; private set; }
         public static float SfxVolume { get; private set; }
         public static bool Fullscreen { get; private set; }
+
+        /// <summary>Verdadeiro = joga com W A S D no lugar das setas.</summary>
+        public static bool UseLetters { get; private set; }
+
+        /// <summary>Visual retro: imagem em poucas linhas (pixel aparente).</summary>
+        public static bool Pixel { get; private set; } = true;
+
+        /// <summary>Visual retro: tremor dos vertices.</summary>
+        public static bool Wobble { get; private set; } = true;
 
         /// <summary>0 = baixa, 1 = media, 2 = alta.</summary>
         public static int Quality { get; private set; }
@@ -30,6 +42,11 @@ namespace BananaRoulette
             Fullscreen = PlayerPrefs.GetInt(KeyFullscreen, 0) == 1;
             Quality = PlayerPrefs.GetInt(KeyQuality, 2);
             Loc.Current = (Language)PlayerPrefs.GetInt(KeyLanguage, (int)Language.Portuguese);
+            UseLetters = PlayerPrefs.GetInt(KeyLetters, 0) == 1;
+            Pixel = PlayerPrefs.GetInt(KeyPixel, 1) == 1;
+            Wobble = PlayerPrefs.GetInt(KeyWobble, 1) == 1;
+            VisualRetro.Pixel = Pixel;
+            VisualRetro.Tremor = Wobble;
 
             ApplyAudio();
         }
@@ -77,6 +94,29 @@ namespace BananaRoulette
                 int target = Mathf.RoundToInt(Quality / 2f * (count - 1));
                 QualitySettings.SetQualityLevel(target, true);
             }
+        }
+
+        public static void SetUseLetters(bool value)
+        {
+            UseLetters = value;
+            PlayerPrefs.SetInt(KeyLetters, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+
+        public static void SetPixel(bool value)
+        {
+            Pixel = value;
+            VisualRetro.Pixel = value;
+            PlayerPrefs.SetInt(KeyPixel, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+
+        public static void SetWobble(bool value)
+        {
+            Wobble = value;
+            VisualRetro.Tremor = value;
+            PlayerPrefs.SetInt(KeyWobble, value ? 1 : 0);
+            PlayerPrefs.Save();
         }
 
         public static void SetLanguage(Language language)

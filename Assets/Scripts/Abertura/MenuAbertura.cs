@@ -53,7 +53,7 @@ namespace BananaRoulette
         Renderer creditos;
         Text dica, letreiro;
         Canvas tela;
-        SettingsScreen ajustes;
+        PaginaOpcoes pagina;
         bool pronto;
 
         static Vector3 V(float x, float y, float z) { return new Vector3(-x, y, z); }
@@ -110,7 +110,13 @@ namespace BananaRoulette
                 {
                     if (m == null) continue;
                     if (m.name.StartsWith("TampaEstudio")) matTampa = m;
-                    else if (m.name.StartsWith("TampaPagina")) matPagina = m;
+                    else if (m.name.StartsWith("TampaPagina"))
+                    {
+                        matPagina = m;
+                        var mf = r.GetComponent<MeshFilter>();
+                        float meia = mf != null && mf.sharedMesh != null ? mf.sharedMesh.bounds.extents.y : 0.17f;
+                        if (pagina == null) pagina = PaginaOpcoes.Criar(r.transform, meia);
+                    }
                 }
             }
             foreach (Transform t in tocador.transform)
@@ -239,13 +245,16 @@ namespace BananaRoulette
             else { sel = Mathf.Clamp(i, 0, d.menu.Length - 1); if (aciona) Ativa(d.menu[sel].nome); }
         }
 
+        /// <summary>A pagina de opcoes aberta na tampa (nula antes de o menu ficar pronto). Serve para testar.</summary>
+        public PaginaOpcoes Pagina { get { return pagina; } }
+
         // ------------------------------------------------------------------ entrada
 
         void Update()
         {
             if (!pronto) return;
             float dt = Time.deltaTime;
-            if (ajustes == null) Entrada();
+            Entrada();
             Passo(dt);
             Desenha(dt);
         }
@@ -298,8 +307,8 @@ namespace BananaRoulette
                     break;
                 }
                 case Modo.Pagina:
-                    if (enter) AbreAjustes();
-                    else if (qualquer) modo = origem;
+                    if (pagina == null) { if (qualquer) modo = origem; }
+                    else if (pagina.Entrada(cam)) { pagina.Fechar(); modo = origem; }
                     break;
                 case Modo.Creditos:
                     if (qualquer) modo = Modo.Menu;
@@ -330,19 +339,11 @@ namespace BananaRoulette
 
         void AbrePagina(string nome)
         {
-            PoeTextura(matPagina, Resources.Load<Texture2D>("Abertura/pagina-" + nome));
+            // a tampa fica lisa e a pagina e escrita por cima, ligada aos ajustes de verdade
+            if (pagina != null) { PoeTextura(matPagina, texLisa); pagina.Abrir(nome); }
+            else PoeTextura(matPagina, Resources.Load<Texture2D>("Abertura/pagina-" + nome));
             origem = Modo.Opcoes; modo = Modo.Pagina;
             SomRetro.Tom(300f, 0.08f, "square", 0.05f);
-        }
-
-        // Os ajustes de verdade (som, tela, idioma) continuam na tela que o jogo ja tinha.
-        void AbreAjustes()
-        {
-            ajustes = SettingsScreen.Build(tela.transform, () =>
-            {
-                if (ajustes != null) Destroy(ajustes.gameObject);
-                ajustes = null;
-            });
         }
 
         void ComecaPartida() { jaCarimbou = true; IrPara(AppEntry.Screen.Game); }
@@ -491,7 +492,7 @@ namespace BananaRoulette
             creditos.enabled = cc.a > 0.02f;
 
             dica.text = Dica();
-            Color cd = dica.color; cd.a = ajustes != null ? 0f : 0.55f + 0.45f * Mathf.Sin(r * 4f); dica.color = cd;
+            Color cd = dica.color; cd.a = 0.55f + 0.45f * Mathf.Sin(r * 4f); dica.color = cd;
             letreiro.enabled = (modo == Modo.Cena || modo == Modo.Fim) && (tocador.MostrarTitulo || modo == Modo.Fim);
         }
 
@@ -503,7 +504,7 @@ namespace BananaRoulette
                 case Modo.Titulo: return "Clique ou aperte qualquer tecla";
                 case Modo.Menu: return "Clique numa opção · ou setas e Enter";
                 case Modo.Opcoes: return "Clique numa opção · Esc volta";
-                case Modo.Pagina: return "Enter abre os ajustes · clique para voltar";
+                case Modo.Pagina: return "Clique à esquerda ou à direita da linha para mudar · Esc volta";
                 case Modo.Creditos: return "Clique para voltar";
                 case Modo.Cena: return tocador.Tempo < 6f ? "Enter pula a abertura" : "";
                 default: return "";

@@ -83,6 +83,16 @@ namespace BananaRoulette
             var keyboard = Keyboard.current;
             if (keyboard == null) return false;
 
+            // Opcoes > Jogabilidade > Teclas: com letras, W A S D valem como as setas.
+            if (GameSettings.UseLetters)
+            {
+                if (keyboard.aKey.wasPressedThisFrame) { direction = ArrowDirection.Left; return true; }
+                if (keyboard.dKey.wasPressedThisFrame) { direction = ArrowDirection.Right; return true; }
+                if (keyboard.wKey.wasPressedThisFrame) { direction = ArrowDirection.Up; return true; }
+                if (keyboard.sKey.wasPressedThisFrame) { direction = ArrowDirection.Down; return true; }
+                return false;
+            }
+
             if (keyboard.leftArrowKey.wasPressedThisFrame) { direction = ArrowDirection.Left; return true; }
             if (keyboard.rightArrowKey.wasPressedThisFrame) { direction = ArrowDirection.Right; return true; }
             if (keyboard.upArrowKey.wasPressedThisFrame) { direction = ArrowDirection.Up; return true; }

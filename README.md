@@ -128,16 +128,21 @@ com a Abertura em primeiro. A regra do jogo não mudou: é a mesma do protótipo
 | `Assets/Scripts/Abertura/MenuAbertura.cs` | O menu: carimbo, câmera, clique nas opções pintadas, créditos no chão |
 | `Assets/Resources/Abertura/menu.json` | Posições de câmera e áreas de clique, exportadas da prévia |
 | `Assets/Resources/Abertura/*.png` | Tampa lisa e carimbada, páginas das opções, créditos |
+| `Assets/Scripts/Abertura/PaginaOpcoes.cs` | Páginas de opções escritas na tampa do caixote de trás, ligadas ao `GameSettings` |
 | `Assets/Scripts/Abertura/SomRetro.cs` | Som de rascunho fabricado por código (sem arquivo de áudio) |
 | `Assets/Scripts/Visual/VisualRetro.cs` | Pixel aparente (320 linhas) e troca dos materiais; entra sozinho em toda cena |
 | `Assets/Resources/Shaders/BananaRetro.shader` | Tremor dos vértices e faces chapadas, com a luz e a sombra da Unity |
 
 Teclas de teste: **F1** liga/desliga o pixel, **F2** liga/desliga o tremor.
 
+Nas páginas de opções: clique à esquerda da linha diminui, à direita aumenta; setas também
+valem. O que cada página muda: **Som** e **Música** (volume), **Tela** (tela cheia, qualidade,
+pixel, tremor), **Idioma** (português/inglês), **Jogabilidade** (jogar com setas ou com
+W A S D). **Controles** só mostra as teclas. Tudo fica guardado entre uma sessão e outra.
+
 ### O que ainda não veio
 
-- As **páginas de opções** nos caixotes são pintura: ainda não mudam nada. Com uma página
-  aberta, **Enter** abre a tela de ajustes de verdade (a do protótipo).
+- As **páginas de opções** usam a fonte padrão da Unity, não a letra pintada dos caixotes.
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
 - A **partida** ainda é greybox (cápsulas); só ganhou o pixel aparente.
 - O **traço de desenho** (sombra em degraus) e **balões com transparência suave**.
