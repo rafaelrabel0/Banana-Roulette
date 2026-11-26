@@ -95,7 +95,7 @@ namespace BananaRoulette
             switch (nome)
             {
                 case "som":
-                    titulo = () => Loc.Get("set.audio");
+                    titulo = () => T("SOM", "SOUND");
                     Volume(() => Loc.Get("set.sfx"), () => GameSettings.SfxVolume, GameSettings.SetSfx);
                     break;
                 case "musica":
@@ -104,7 +104,7 @@ namespace BananaRoulette
                     Aviso(() => T("Ainda não há música no jogo.", "There is no music in the game yet."));
                     break;
                 case "tela":
-                    titulo = () => Loc.Get("set.video");
+                    titulo = () => T("TELA", "SCREEN");
                     Add(() => Loc.Get("set.fullscreen"), () => Liga(GameSettings.Fullscreen), dir => GameSettings.SetFullscreen(!GameSettings.Fullscreen));
                     Add(() => Loc.Get("set.quality"),
                         () => Loc.Get(GameSettings.Quality == 0 ? "set.quality.low" : GameSettings.Quality == 1 ? "set.quality.mid" : "set.quality.high"),

@@ -50,6 +50,9 @@ namespace BananaRoulette
         Transform caixote, carimbo, seta;
         Material matTampa, matPagina, matCreditos;
         Texture texLisa, texEstudio;
+        // faces pintadas que mudam com o idioma: [0] portugues (a que veio no .glb), [1] ingles (Resources)
+        Material matFrente, matOpcoes, matLateral;
+        readonly Texture[] texFrente = new Texture[2], texOpcoes = new Texture[2], texLateral = new Texture[2], texCreditos = new Texture[2], texTampa = new Texture[2];
         Renderer creditos;
         Text dica, letreiro;
         Canvas tela;
@@ -72,7 +75,14 @@ namespace BananaRoulette
             tocador.aoTerminar.AddListener(() => { if (modo == Modo.Cena) { modo = Modo.Fim; fimEm = Time.time + 1.6f; } });
 
             texLisa = Resources.Load<Texture2D>("Abertura/tampa-lisa");
-            texEstudio = Resources.Load<Texture2D>("Abertura/tampa-estudio");
+            texTampa[0] = Resources.Load<Texture2D>("Abertura/tampa-estudio");
+            texTampa[1] = Resources.Load<Texture2D>("Abertura/tampa-estudio-en");
+            texFrente[1] = Resources.Load<Texture2D>("Abertura/menu-frente-en");
+            texOpcoes[1] = Resources.Load<Texture2D>("Abertura/menu-opcoes-en");
+            texLateral[1] = Resources.Load<Texture2D>("Abertura/menu-lateral-en");
+            texCreditos[0] = Resources.Load<Texture2D>("Abertura/creditos-chao");
+            texCreditos[1] = Resources.Load<Texture2D>("Abertura/creditos-chao-en");
+            texEstudio = texTampa[0];
 
             // O carimbo nasce aqui, antes do Start do visual retro, para ganhar o mesmo material das outras pecas.
             var modelo = Resources.Load<GameObject>("Abertura/carimbo");
@@ -110,6 +120,9 @@ namespace BananaRoulette
                 {
                     if (m == null) continue;
                     if (m.name.StartsWith("TampaEstudio")) matTampa = m;
+                    else if (m.name.StartsWith("MenuFrente")) { matFrente = m; texFrente[0] = LeTextura(m); }
+                    else if (m.name.StartsWith("MenuOpcoes")) { matOpcoes = m; texOpcoes[0] = LeTextura(m); }
+                    else if (m.name.StartsWith("MenuLateral")) { matLateral = m; texLateral[0] = LeTextura(m); }
                     else if (m.name.StartsWith("TampaPagina"))
                     {
                         matPagina = m;
@@ -122,7 +135,33 @@ namespace BananaRoulette
             foreach (Transform t in tocador.transform)
                 if (t.name.StartsWith("CaixoteEsquerda")) caixote = t;
             MontarSeta();
+            // a tampa de tras comeca lisa: o tutorial pintado nela nao vale mais (o botao abre o tutorial de verdade)
+            PoeTextura(matPagina, texLisa);
+            Loc.OnLanguageChanged += AplicaIdioma;
+            AplicaIdioma();
             pronto = true;
+        }
+
+        void OnDestroy() { Loc.OnLanguageChanged -= AplicaIdioma; }
+
+        static string T(string pt, string en) { return Loc.Current == Language.Portuguese ? pt : en; }
+
+        static Texture LeTextura(Material m)
+        {
+            if (m.HasProperty("_BaseMap")) return m.GetTexture("_BaseMap");
+            return m.HasProperty("baseColorTexture") ? m.GetTexture("baseColorTexture") : null;
+        }
+
+        // Troca a tinta dos caixotes, da tampa e dos creditos pela do idioma escolhido em Opcoes > Idioma.
+        void AplicaIdioma()
+        {
+            int i = Loc.Current == Language.Portuguese ? 0 : 1;
+            PoeTextura(matFrente, texFrente[i] != null ? texFrente[i] : texFrente[0]);
+            PoeTextura(matOpcoes, texOpcoes[i] != null ? texOpcoes[i] : texOpcoes[0]);
+            PoeTextura(matLateral, texLateral[i] != null ? texLateral[i] : texLateral[0]);
+            texEstudio = texTampa[i] != null ? texTampa[i] : texTampa[0];
+            if (matCreditos != null) matCreditos.mainTexture = texCreditos[i] != null ? texCreditos[i] : texCreditos[0];
+            if (letreiro != null) letreiro.text = T("A partida começa!", "The match begins!");
         }
 
         CamJ Cam(string nome)
@@ -500,13 +539,13 @@ namespace BananaRoulette
         {
             switch (modo)
             {
-                case Modo.Espera: return "Clique para começar";
-                case Modo.Titulo: return "Clique ou aperte qualquer tecla";
-                case Modo.Menu: return "Clique numa opção · ou setas e Enter";
-                case Modo.Opcoes: return "Clique numa opção · Esc volta";
-                case Modo.Pagina: return "Clique à esquerda ou à direita da linha para mudar · Esc volta";
-                case Modo.Creditos: return "Clique para voltar";
-                case Modo.Cena: return tocador.Tempo < 6f ? "Enter pula a abertura" : "";
+                case Modo.Espera: return T("Clique para começar", "Click to start");
+                case Modo.Titulo: return T("Clique ou aperte qualquer tecla", "Click or press any key");
+                case Modo.Menu: return T("Clique numa opção · ou setas e Enter", "Click an option · or arrows and Enter");
+                case Modo.Opcoes: return T("Clique numa opção · Esc volta", "Click an option · Esc goes back");
+                case Modo.Pagina: return T("Clique à esquerda ou à direita da linha para mudar · Esc volta", "Click left or right of the line to change · Esc goes back");
+                case Modo.Creditos: return T("Clique para voltar", "Click to go back");
+                case Modo.Cena: return tocador.Tempo < 6f ? T("Enter pula a abertura", "Enter skips the intro") : "";
                 default: return "";
             }
         }

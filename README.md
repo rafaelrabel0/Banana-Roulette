@@ -141,6 +141,10 @@ valem. O que cada página muda: **Som** e **Música** (volume), **Tela** (tela c
 pixel, tremor), **Idioma** (português/inglês), **Jogabilidade** (jogar com setas ou com
 W A S D). **Controles** só mostra as teclas. Tudo fica guardado entre uma sessão e outra.
 
+O **idioma** troca tudo de uma vez: a tinta dos caixotes, da tampa e dos créditos (imagens
+`*-en.png` em `Assets/Resources/Abertura`), as dicas no pé da tela, as páginas e a partida.
+As marcas dos caixotes do cenário (EXPLOSIVOS, DINAMITE) ficam em português: são parte do desenho.
+
 ### O que ainda não veio
 
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
