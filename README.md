@@ -83,3 +83,44 @@ Arte, rede e som entram depois da resposta.
 ## Equipe
 
 Ape Games — Yan · Rafael · Vinicius · Oneir · Carleon
+
+## Cena de abertura 3D (ramo `abertura-3d`)
+
+A abertura do jogo (menu no caixote, o macaco, o aviador, a roda) foi desenhada fora da
+Unity, numa prévia em three.js, e chega aqui **assada**: um único arquivo com todas as
+peças e 41 s de movimento.
+
+| Arquivo | O que é |
+|---------|---------|
+| `Assets/Abertura/abertura.glb` | A cena inteira, com a animação. 12 MB, vai por Git LFS |
+| `Assets/Abertura/abertura.json` | O que o `.glb` não carrega: campo de visão por quadro, quando é céu, quando entra o letreiro |
+| `Assets/Abertura/Modelos/*.glb` | Macaco, aviador, caixote, maço de dinamite e carimbo, soltos e parados |
+| `Assets/Scripts/Abertura/AberturaPlayer.cs` | Toca a cena e move a câmera |
+| `Assets/Editor/MontaAbertura.cs` | Menu que monta a cena sozinho |
+
+### Como ver
+
+1. Abra o projeto. Na primeira vez a Unity baixa o pacote **glTFast** (`com.unity.cloud.gltfast`),
+   que é quem sabe ler `.glb`.
+2. No menu de cima: **Banana Roulette → Montar cena de abertura**.
+3. Aparece o aviso "Cena criada em Assets/Scenes/Abertura.unity". Aperte **Play**.
+
+Se a cena aparecer de costas, selecione o objeto `Abertura` e desmarque
+**Girar Camera 180** no componente `Abertura Player`.
+
+### Visual retrô
+
+Desde 26/11/2026 o padrão do jogo é o visual de poucos triângulos: formas angulares, faces
+chapadas, texturas de 64 pixels. **Os modelos e as texturas já vêm assim no `.glb`.** O que
+depende da Unity ainda não foi feito:
+
+- desenhar a imagem com 320 linhas e ampliar sem suavizar (pixel aparente);
+- prender os vértices a uma grade na tela (o tremor).
+
+### O que ainda não veio
+
+- O **traço de desenho** (sombra em degraus). O contorno preto veio, porque é malha; a
+  sombra em degraus depende de um shader que ainda não foi escrito para a URP.
+- O **menu** (carimbo, opções nos caixotes). Só a cena de abertura foi assada.
+- **Som**, **letreiro** e **balões com transparência suave**.
+- Otimização: são cerca de 5.400 objetos. Serve para ver, não para entregar.
