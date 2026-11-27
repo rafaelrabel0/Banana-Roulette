@@ -109,6 +109,18 @@ namespace BananaRoulette
         /// no lugar antigo ela tapava a bomba na mao do jogador.
         /// </summary>
         /// <summary>Esconde ou mostra a fila de setas (o menu da partida esconde enquanto esta aberto).</summary>
+        private bool _endShown, _endSuspended;
+
+        /// <summary>
+        /// Tira a tela de fim de partida da frente (sem esquecer que ela existe) enquanto o menu da partida
+        /// esta aberto, e devolve quando ele fecha.
+        /// </summary>
+        public void SuspendEnd(bool suspend)
+        {
+            _endSuspended = suspend;
+            if (_endPanel != null) _endPanel.SetActive(_endShown && !suspend);
+        }
+
         public void SetKeysVisible(bool visible)
         {
             if (_keyRow != null) _keyRow.gameObject.SetActive(visible);
@@ -351,11 +363,13 @@ namespace BananaRoulette
             _endTitle.text = playerWon ? Loc.Get("game.yousurvived") : Loc.Get("game.youexploded");
             _endTitle.color = playerWon ? Palette.BananaYellow : Palette.DynamiteRed;
             _endSubtitle.text = Loc.Get("game.again");
-            _endPanel.SetActive(true);
+            _endShown = true;
+            _endPanel.SetActive(!_endSuspended);
         }
 
         public void HideEnd()
         {
+            _endShown = false;
             _endPanel.SetActive(false);
         }
 

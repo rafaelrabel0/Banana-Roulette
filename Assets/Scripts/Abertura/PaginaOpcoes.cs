@@ -149,6 +149,7 @@ namespace BananaRoulette
                     Volume(() => Loc.Get("set.sfx"), () => GameSettings.SfxVolume, GameSettings.SetSfx);
                     Add(() => T("Teclas", "Keys"), () => GameSettings.UseLetters ? T("LETRAS (W A S D)", "LETTERS (W A S D)") : T("SETAS", "ARROWS"),
                         dir => GameSettings.SetUseLetters(!GameSettings.UseLetters));
+                    linhas.Add(new Linha { rotulo = () => T("Nova partida", "New match"), acao = "nova" });
                     linhas.Add(new Linha { rotulo = () => T("Sair da partida", "Leave the match"), acao = "sair" });
                     rotuloVoltar = () => T("Voltar ao jogo", "Back to the game");
                     break;

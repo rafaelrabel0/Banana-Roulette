@@ -154,6 +154,7 @@ namespace BananaRoulette
                 _banana.UpdateFuseVisual(burned);
                 if (_hud != null && _hud.TopFuse != null) _hud.TopFuse.SetProgress(burned);
                 MonkeySlot.Tensao = burned;
+                MusicaRetro.Perigo = burned * 0.7f;
 
                 // Enquanto ele le, o pavio queima de verdade, mas para em um terco: tem de sobrar tempo para jogar.
                 if (_lendo && _fuse.IsRunning && _fuse.BurnedFraction >= 1f / 3f) _fuse.Stop();
@@ -180,6 +181,7 @@ namespace BananaRoulette
 
             // Continuacao da abertura: a bomba cai do alto na mao do jogador, ele se assusta e comeca o malabarismo.
             _holderIndex = 0;
+            MusicaRetro.Tocar(MusicaRetro.Clima.Jogo);
             _speechBox.gameObject.SetActive(false);
             _banana.transform.position = _slots[0].HandPosition + Vector3.up * 14f;
             _slots[0].Receber();

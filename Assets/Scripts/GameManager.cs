@@ -118,6 +118,8 @@ namespace BananaRoulette
 
                 if (_banana != null) _banana.UpdateFuseVisual(burned);
                 MonkeySlot.Tensao = burned;
+                MusicaRetro.Perigo = Current == State.GameOver ? 0f : burned;
+                SonsDaRodada(burned);
 
                 // A barra do topo anda pela MESMA fracao: e o mesmo pavio, visto
                 // de outro jeito.
@@ -147,6 +149,7 @@ namespace BananaRoulette
         private IEnumerator RunMatch()
         {
             Current = State.Setup;
+            MusicaRetro.Tocar(MusicaRetro.Clima.Jogo);
 
             // A banana comeca na mao do jogador, nao sorteada: apertar JOGAR
             // tem que virar acao na hora, sem esperar a roda dar meia volta.
@@ -224,6 +227,7 @@ namespace BananaRoulette
             {
                 if (holder.IsHuman && !memoryRound) _hud.RegisterHit(progress);
                 holder.Acertou();
+                SomRetro.Tom(660f + 110f * Mathf.Min(progress, 6), 0.05f, "square", 0.05f); // cada acerto sobe um degrau
             };
             solver.OnArrowMissed += () => HandleMiss(holder);
             solver.OnPassChosen += side => { _chosenSide = side; _turnResolved = true; };
@@ -254,6 +258,25 @@ namespace BananaRoulette
             yield return PassBanana();
         }
 
+        private float _proximoGrito, _proximoEstalo;
+
+        // Quem segura a bomba faz barulho, e mais barulho quanto menos pavio sobra. O pavio estala junto.
+        private void SonsDaRodada(float burned)
+        {
+            if (Current != State.Holding && Current != State.Passing) return;
+            if (Time.time >= _proximoGrito)
+            {
+                _proximoGrito = Time.time + Mathf.Lerp(1.3f, 0.32f, burned) * Random.Range(0.8f, 1.2f);
+                float f = burned > 0.7f ? 760f : burned > 0.38f ? 620f : 480f;
+                SomRetro.Grito(f, f * 1.45f, burned > 0.7f ? 0.2f : 0.13f, Mathf.Round(Mathf.Lerp(0.22f, 0.45f, burned) * 20f) / 20f); // volume em degraus, para nao fabricar um som novo a cada quadro
+            }
+            if (Time.time >= _proximoEstalo)
+            {
+                _proximoEstalo = Time.time + Mathf.Lerp(0.45f, 0.07f, burned);
+                SomRetro.Ruido(0.05f, 0.05f, 6000f, "highpass");
+            }
+        }
+
         /// <summary>
         /// Errar nao custa so os milissegundos perdidos: queima um pedaco do
         /// pavio de uma vez. E o que faz pressa e calma brigarem de verdade.
@@ -262,6 +285,8 @@ namespace BananaRoulette
         {
             holder.FlashError();
             StartCoroutine(_banana.Fumble(_config.errorLockoutSeconds));
+            SomRetro.Tom(170f, 0.2f, "sawtooth", 0.12f, 90f);   // buzina de erro
+            SomRetro.Grito(760f, 420f, 0.22f, 0.4f);             // o macaco se assusta
 
             _fuse.Burn(_config.errorFusePenaltySeconds);
             _banana.FlashBurn();
@@ -284,6 +309,11 @@ namespace BananaRoulette
             _slots[_holderIndex].SetHolding(false);
             _slots[_holderIndex].Arremessar(_slots[nextIndex].transform.position);
             _slots[nextIndex].Receber();
+            SomRetro.Ruido(0.25f, 0.18f, 900f, "bandpass");            // a bomba cortando o ar
+            SomRetro.Grito(600f, 950f, 0.14f, 0.45f, 0.3f);            // quem recebe da um berro
+            SomRetro.Grito(520f, 640f, 0.07f, 0.3f, 0.5f);             // quem jogou ri: ha, ha, ha
+            SomRetro.Grito(560f, 680f, 0.07f, 0.3f, 0.62f);
+            SomRetro.Grito(600f, 720f, 0.09f, 0.3f, 0.74f);
             _lastPasserIndex = _holderIndex;
 
             // A posse muda no instante do arremesso: quem passou a tempo se
@@ -314,6 +344,8 @@ namespace BananaRoulette
 
             if (_shake != null) _shake.Shake(0.45f, 0.55f);
             StartCoroutine(FlashRoutine());
+            SomRetro.Ruido(0.7f, 0.7f, 180f, "lowpass");   // bum
+            SomRetro.Tom(90f, 0.5f, "sine", 0.6f, 35f);
 
             // As duas bananas estouram no mesmo instante: a da mao e a do topo.
             if (_hud.TopFuse != null) StartCoroutine(_hud.TopFuse.Explode());

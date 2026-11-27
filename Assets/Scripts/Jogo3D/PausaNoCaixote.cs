@@ -48,7 +48,11 @@ namespace BananaRoulette
             p.cam = camera; p.face = face; p.hud = hud; p.bombaComJogador = bombaComJogador; p.sair = sair;
             p.casaPos = camera.transform.position; p.casaGiro = camera.transform.rotation; p.casaCampo = camera.fieldOfView;
             p.pagina = PaginaOpcoes.Criar(face, new Vector3(0f, 0f, meiaEspessura + 0.03f), Quaternion.LookRotation(Vector3.back, Vector3.up), 1000f, 620f);
-            p.pagina.AoEscolher = acao => { if (acao == "sair") { Aberta = false; p.sair(); } };
+            p.pagina.AoEscolher = acao =>
+            {
+                if (acao == "nova") { Aberta = false; AppEntry.GoTo(AppEntry.Screen.Game); }
+                else if (acao == "sair") p.StartCoroutine(p.SaiAteALogo());
+            };
             p.MontarTela(canvas);
             Aberta = false;
             return p;
@@ -88,7 +92,7 @@ namespace BananaRoulette
             if (Aberta) return;
             Aberta = true; pressa = 1f;
             pagina.Abrir("pausa");
-            if (hud != null) hud.SetKeysVisible(false);
+            if (hud != null) { hud.SetKeysVisible(false); hud.SuspendEnd(true); }
             SomRetro.Tom(300f, 0.08f, "square", 0.05f);
         }
 
@@ -97,7 +101,37 @@ namespace BananaRoulette
             if (!Aberta) return;
             Aberta = false; pressa = comPressa;
             pagina.Fechar();
-            if (hud != null) hud.SetKeysVisible(true);
+            if (hud != null) { hud.SetKeysVisible(true); hud.SuspendEnd(false); }
+        }
+
+        bool saindo;
+
+        // Sair da partida sem corte: a camera anda ate a frente do caixote principal (a logo do jogo) e so
+        // entao a cena do menu e carregada, ja na tela "aperte qualquer tecla", com a camera no mesmo lugar.
+        System.Collections.IEnumerator SaiAteALogo()
+        {
+            saindo = true;
+            pagina.Fechar();
+            alerta.SetActive(false);
+            if (hud != null) hud.SetVisible(false);
+            MusicaRetro.Tocar(MusicaRetro.Clima.Menu);
+
+            Transform mundo = face.root;
+            Vector3 dePos = cam.transform.position; Quaternion deGiro = cam.transform.rotation; float deCampo = cam.fieldOfView;
+            Vector3 atePos = mundo.TransformPoint(new Vector3(0f, 3.7f, 17.5f));
+            Quaternion ateGiro = Quaternion.LookRotation(mundo.TransformPoint(new Vector3(0f, 3.2f, 0f)) - atePos);
+            float t = 0f;
+            while (t < 1f)
+            {
+                t += Time.unscaledDeltaTime / 1.3f;
+                float s = Mathf.Clamp01(t); s = s * s * (3f - 2f * s);
+                cam.transform.SetPositionAndRotation(Vector3.Lerp(dePos, atePos, s), Quaternion.Slerp(deGiro, ateGiro, s));
+                cam.fieldOfView = Mathf.Lerp(deCampo, 32f, s);
+                yield return null;
+            }
+            Aberta = false;
+            MenuAbertura.EntrarNoTitulo = true;
+            sair();
         }
 
         /// <summary>Do alerta: fecha o menu e devolve a camera a roda bem depressa.</summary>
@@ -105,6 +139,7 @@ namespace BananaRoulette
 
         void Update()
         {
+            if (saindo) return;
             var tec = Keyboard.current;
             bool esc = tec != null && tec.escapeKey.wasPressedThisFrame;
 
@@ -127,6 +162,7 @@ namespace BananaRoulette
         // Depois do tremor de camera (que roda antes), para o menu mandar na camera enquanto esta aberto.
         void LateUpdate()
         {
+            if (saindo) return;
             float alvo = Aberta ? 1f : 0f;
             if (Mathf.Approximately(k, alvo)) { if (rotuloBotao != null) rotuloBotao.text = Aberta ? T("VOLTAR", "BACK") : "MENU"; return; }
             k = Mathf.MoveTowards(k, alvo, Time.deltaTime * 2.2f * pressa);

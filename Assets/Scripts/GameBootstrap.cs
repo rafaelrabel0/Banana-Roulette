@@ -138,7 +138,8 @@ namespace BananaRoulette
 
         private Camera BuildCamera()
         {
-            var go = new GameObject("Main Camera", typeof(Camera), typeof(CameraShake));
+            // AudioListener: sem ele a cena fica muda (o prototipo nao tinha som)
+            var go = new GameObject("Main Camera", typeof(Camera), typeof(CameraShake), typeof(AudioListener));
             go.tag = "MainCamera";
 
             var cam = go.GetComponent<Camera>();

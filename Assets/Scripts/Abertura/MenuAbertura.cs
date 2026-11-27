@@ -42,6 +42,9 @@ namespace BananaRoulette
         // Na primeira vez o carimbo bate; voltando da partida, o menu abre direto.
         static bool jaCarimbou;
 
+        /// <summary>Ligado por quem sai de uma partida: o menu nasce na tela do titulo ("aperte qualquer tecla"), com a camera ja na logo.</summary>
+        public static bool EntrarNoTitulo;
+
         DadosJ d;
         Modo modo = Modo.Espera, modoAnt = Modo.Espera, origem = Modo.Menu;
         float relogio, camFov = 32f, fimEm = -1f;
@@ -117,9 +120,11 @@ namespace BananaRoulette
                 new GameObject("EventSystem", typeof(EventSystem)).AddComponent<InputSystemUIInputModule>();
             if (FindFirstObjectByType<AudioListener>() == null) cam.gameObject.AddComponent<AudioListener>();
 
-            CamJ c = Cam(jaCarimbou ? "menu" : "espera");
+            CamJ c = Cam(EntrarNoTitulo ? "titulo" : jaCarimbou ? "menu" : "espera");
             camPos = V(c.p); camOlhar = V(c.o); camFov = c.f;
-            if (jaCarimbou) { modo = modoAnt = Modo.Menu; relogio = 8f; }
+            if (EntrarNoTitulo) { modo = modoAnt = Modo.Titulo; relogio = 8f; jaCarimbou = true; EntrarNoTitulo = false; }
+            else if (jaCarimbou) { modo = modoAnt = Modo.Menu; relogio = 8f; }
+            MusicaRetro.Tocar(MusicaRetro.Clima.Menu);
         }
 
         IEnumerator Start()
@@ -587,6 +592,17 @@ namespace BananaRoulette
         {
             float r = relogio;
             bool noMenu = modo != Modo.Cena && modo != Modo.Fim;
+
+            // A musica acompanha a emocao de cada trecho da abertura.
+            if (modo == Modo.Cena)
+            {
+                float tc = tocador.Tempo;
+                MusicaRetro.Tocar(tc < 7.25f ? MusicaRetro.Clima.Calmo     // chega com fome e preguica
+                                : tc < 15.1f ? MusicaRetro.Clima.Duvida    // olha o caixote sem entender
+                                : tc < 18.4f ? MusicaRetro.Clima.Alegria   // "sao bananas!"
+                                : tc < 27.0f ? MusicaRetro.Clima.Vilao     // o aviador
+                                : MusicaRetro.Clima.Tensao);               // a bituca, o pavio aceso, a roda
+            }
 
             if (noMenu)
             {

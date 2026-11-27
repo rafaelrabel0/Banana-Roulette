@@ -182,10 +182,28 @@ As animações nascem na prévia (`poseJogo` em `cena-abertura.html`) e são exp
 Para criar um acessório: modelar na função `acessorios` da prévia, rodar `__cena.exportaJogo()`
 e acrescentar o nome na lista de `Aparencia.cs`.
 
+### Menu da partida, tutorial, som e música
+
+- **Menu da partida:** Esc ou o botão MENU leva a câmera ao caixote de dinamite ao lado da roda. A partida
+  não para. Se a bomba chegar na mão do jogador, aparece um alerta que devolve a câmera na hora.
+  Tem NOVA PARTIDA e SAIR DA PARTIDA. Sair não corta: a câmera anda até a logo e a cena do menu
+  entra na tela "aperte qualquer tecla" (`PausaNoCaixote.cs`, `MenuAbertura.EntrarNoTitulo`).
+- **Tutorial:** a bomba cai na mão do macaco, as falas ficam no topo e avançam com Espaço. O pavio
+  queima enquanto se lê e para em um terço até a hora de digitar (`TutorialDirector.cs`).
+- **Explosão:** o macaco não morre nem fica tostado; sai voando para o lado, gritando (`MonkeySlot.VoaLonge`).
+- **Sons:** acerto, erro, arremesso, susto de quem recebe, risada de quem jogou, gritos de quem segura
+  (mais rápidos conforme o pavio acaba), estalo do pavio, explosão; e a floresta ao fundo
+  (`AmbienteSelva.cs`). Tudo fabricado por código em `SomRetro.cs`.
+- **Música:** `Assets/Scripts/Som/MusicaRetro.cs` é uma orquestrinha sintetizada (flauta, clarinete,
+  fagote, trompete, trombone, cordas, tímpano, caixa). Tem um tema e sete climas: Menu, Calmo, Dúvida,
+  Alegria, Vilão, Tensão e Jogo. Na abertura o clima troca conforme a cena; na partida o tema acelera
+  e ganha tímpano, caixa e cordas tremidas conforme `MusicaRetro.Perigo` sobe. **É rascunho:** não é
+  orquestra gravada. Para trocar por música de verdade, basta substituir essa classe.
+
 ### O que ainda não veio
 
-- Som da partida, fumaça na explosão.
-- Menu de pausa no caixote, tutorial novo, power-ups.
+- A abertura virar a partida sem corte, emojis/emotes, power-ups.
+- Música gravada, fumaça na explosão.
 
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
 - O **traço de desenho** (sombra em degraus) e **balões com transparência suave**.

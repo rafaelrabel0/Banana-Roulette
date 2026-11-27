@@ -130,7 +130,7 @@ namespace BananaRoulette
             IsAlive = false;
             _isHolding = false;
             StopAllCoroutines();
-            if (_visual != null) { _visual.Tocar("explode", true); _visual.Tostar(); return; }
+            if (_visual != null) { StartCoroutine(VoaLonge()); return; }
             StartCoroutine(ExplodeRoutine());
         }
 
@@ -168,6 +168,30 @@ namespace BananaRoulette
                 transform.localScale = Vector3.Lerp(_baseScale * 1.8f, _baseScale * 0.9f, k);
                 yield return null;
             }
+        }
+
+        // A bomba estourou: ele nao morre nem fica tostado. Sai voando para o lado, abanando os bracos e
+        // gritando, ate sumir por cima das arvores. Menos violento e mais engracado.
+        private System.Collections.IEnumerator VoaLonge()
+        {
+            _visual.Laco("erro"); // bracos abanando
+            Vector3 ini = transform.position;
+            Vector3 fora = new Vector3(ini.x, 0f, ini.z).normalized;
+            Vector3 lado = Vector3.Cross(Vector3.up, fora) * (Index % 2 == 0 ? 1f : -1f);
+            Vector3 rumo = (lado + fora * 0.35f).normalized;
+            SomRetro.Grito(1100f, 380f, 1.2f, 0.5f);
+
+            float t = 0f, dur = 2.0f;
+            while (t < dur)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / dur);
+                transform.position = ini + rumo * (30f * k) + Vector3.up * (Mathf.Sin(k * Mathf.PI * 0.8f) * 14f);
+                transform.Rotate(Vector3.forward, 520f * Time.deltaTime, Space.Self);
+                transform.localScale = _baseScale * Mathf.Lerp(1f, 0.4f, k * k);
+                yield return null;
+            }
+            _visual.gameObject.SetActive(false);
         }
 
         /// <summary>Comemoracao do sobrevivente.</summary>
