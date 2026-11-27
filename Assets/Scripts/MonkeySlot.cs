@@ -21,14 +21,11 @@ namespace BananaRoulette
         // A banana da vez fica onde o pe dele bate (animacao "pisa"); as outras fazem fila para fora.
         // Perdeu uma vida: ele pisa nela e sobra a casca. As que restam andam um lugar.
         private readonly Transform[] _bananas = new Transform[3];
-        private Transform _casca, _selo;
-        private Material _matSelo;
-        private UnityEngine.Mesh _malhaSelo;
+        private Transform _casca;
         private PowerUp _seloDe = PowerUp.Nenhum;
         private Vector3 _lugarDoPe, _passoDaFila;
         private int _vidasVisiveis = 2;
         private bool _pisando;
-        private Camera _cam;
 
         public void GanhaVida() { Lives = Mathf.Min(3, Lives + 1); }
 
@@ -135,7 +132,7 @@ namespace BananaRoulette
             Vector2 pe = MacacoVisual.Pisa;
             // a previa tem o X ao contrario da Unity
             _lugarDoPe = _visual.transform.localPosition + _visual.transform.localRotation * (new Vector3(-pe.x, 0f, pe.y) * esc);
-            _passoDaFila = new Vector3(-0.6f, 0f, -0.22f) * (esc / 0.25f);
+            _passoDaFila = new Vector3(-0.62f, 0f, 0.05f) * (esc / 0.25f); // fila para o lado, para nenhuma ficar atras do braco
             float porte = 0.85f * (esc / 0.25f);
 
             Material amarelo = Tinta(new Color(0.96f, 0.80f, 0.22f), true), ponta = Tinta(new Color(0.30f, 0.20f, 0.10f));
@@ -166,25 +163,17 @@ namespace BananaRoulette
             casca.SetActive(false);
             _casca = casca.transform;
 
-            // selo do poder guardado: o desenho 2D do poder, acima da cabeca, virado para a camera
-            var texPoderes = Resources.Load<Texture2D>("Jogo/poderes");
-            if (texPoderes != null)
-            {
-                texPoderes.filterMode = FilterMode.Point;
-                var selo = new GameObject("Poder guardado", typeof(MeshFilter), typeof(MeshRenderer));
-                selo.transform.SetParent(transform, false);
-                selo.transform.localPosition = new Vector3(0f, 4.1f, 0f);
-                _malhaSelo = new UnityEngine.Mesh();
-                _malhaSelo.vertices = new[] { new Vector3(-0.5f, -0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f), new Vector3(0.5f, -0.5f, 0f) };
-                _malhaSelo.triangles = new[] { 0, 1, 2, 0, 2, 3 };
-                _malhaSelo.uv = new[] { Vector2.zero, Vector2.up, Vector2.one, Vector2.right };
-                selo.GetComponent<MeshFilter>().sharedMesh = _malhaSelo;
-                _matSelo = new Material(Shader.Find("Sprites/Default")) { mainTexture = texPoderes };
-                var rs = selo.GetComponent<Renderer>(); rs.sharedMaterial = _matSelo; rs.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                selo.SetActive(false);
-                _selo = selo.transform;
-            }
+            // o poder guardado fica no chao do outro lado (a direita dele), para todo mundo ver o que cada um tem
+            _lugarDoItem = new Vector3(-_lugarDoPe.x * 1.2f, 0f, _lugarDoPe.z);
+            _escalaDoItem = esc * 1.25f;
         }
+
+        private Vector3 _lugarDoItem;
+        private float _escalaDoItem = 0.2f;
+        private GameObject _item;
+
+        /// <summary>Onde o poder guardado deste macaco fica, no mundo.</summary>
+        public Vector3 LugarDoItem { get { return transform.TransformPoint(_lugarDoItem); } }
 
         /// <summary>Faz o objeto crescer ate o tamanho certo quando aparece (a banana nova "brota").</summary>
         private class Porte : MonoBehaviour
@@ -211,20 +200,19 @@ namespace BananaRoulette
             if (_casca != null && _casca.gameObject.activeSelf)
                 _casca.localScale = Vector3.Lerp(_casca.localScale, Vector3.one, Time.deltaTime * 10f);
 
-            if (_selo == null) return;
-            bool tem = IsAlive && Guardado != PowerUp.Nenhum;
-            if (_selo.gameObject.activeSelf != tem) _selo.gameObject.SetActive(tem);
-            if (!tem) return;
-            if (_seloDe != Guardado)
+            PowerUp tem = IsAlive ? Guardado : PowerUp.Nenhum;
+            if (_seloDe != tem)
             {
-                _seloDe = Guardado;
-                int n = (int)Guardado - 1, col = n % 4, lin = n / 4;
-                float u0 = col / 4f, u1 = u0 + 0.25f, v1 = 1f - lin / 4f, v0 = v1 - 0.25f;
-                _malhaSelo.uv = new[] { new Vector2(u0, v0), new Vector2(u0, v1), new Vector2(u1, v1), new Vector2(u1, v0) };
+                _seloDe = tem;
+                if (_item != null) Destroy(_item);
+                _item = ItemPoder.Criar(tem, transform, _escalaDoItem);
+                if (_item != null)
+                {
+                    _item.transform.localPosition = _lugarDoItem;
+                    _item.transform.localRotation = Quaternion.Euler(0f, -35f, 0f);
+                    _item.AddComponent<Porte>().alvo = _escalaDoItem;
+                }
             }
-            if (_cam == null) _cam = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();
-            if (_cam != null) _selo.rotation = _cam.transform.rotation;
-            _selo.localScale = Vector3.one * (0.95f + 0.06f * Mathf.Sin(Time.time * 5f));
         }
 
         private Renderer _renderer;

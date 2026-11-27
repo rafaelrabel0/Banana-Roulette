@@ -297,7 +297,7 @@ namespace BananaRoulette
         private MacacoVisual BuildLancador()
         {
             var lugar = new GameObject("Macaco lancador");
-            lugar.transform.position = new Vector3(0.4f, 0f, config.circleRadius + 4.6f); // no vao entre os dois macacos do fundo
+            lugar.transform.position = new Vector3(0.15f, 0f, config.circleRadius + 5.5f); // encostado nos caixotes de bombas, no vao entre os dois macacos do fundo
             lugar.transform.rotation = Quaternion.LookRotation(new Vector3(-lugar.transform.position.x, 0f, -lugar.transform.position.z));
             var macaco = MacacoVisual.Criar(lugar.transform, Vector3.zero, Escala, new Color32(0x4A, 0x2A, 0x14, 0xFF));
             if (macaco == null) return null;

@@ -44,6 +44,9 @@ namespace BananaRoulette
         /// <summary>Oferece um poder neste turno. Chamar depois de BeginTurn.</summary>
         public virtual void Oferecer(List<ArrowDirection> sequenciaDoPoder) { Oferta = sequenciaDoPoder; }
 
+        /// <summary>O tempo do poder acabou (a bombinha dele estourou): some a oferta, sem contar como erro.</summary>
+        public virtual void CancelarOferta() { if (Oferta != null) RaisePowerUpLost(); }
+
         /// <summary>Troca a sequencia no meio do turno (meia sequencia, sequencia dobrada).</summary>
         public void TrocarSequencia(List<ArrowDirection> nova)
         {

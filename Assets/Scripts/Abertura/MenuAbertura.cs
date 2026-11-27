@@ -437,8 +437,9 @@ namespace BananaRoulette
                     {
                         GameSettings.SetPlayed(true);
                         pagina.Fechar();
-                        if (resposta == "tutorial") IrPara(AppEntry.Screen.Tutorial);
-                        else ComecaAbertura();
+                        // primeira vez: a historia aparece nos dois casos; o tutorial vem depois dela
+                        aposHistoria = resposta == "tutorial" ? AppEntry.Screen.Tutorial : AppEntry.Screen.Game;
+                        ComecaAbertura();
                     };
                     pagina.Abrir("primeira");
                     perguntando = true;
@@ -454,7 +455,14 @@ namespace BananaRoulette
                 else ComecaAbertura();
             }
             else if (nome == "personagem") AbrePersonagem();
-            else if (nome == "tutorial") { SomRetro.Tom(300f, 0.08f, "square", 0.05f); GameSettings.SetPlayed(true); IrPara(AppEntry.Screen.Tutorial); }
+            else if (nome == "tutorial")
+            {
+                SomRetro.Tom(300f, 0.08f, "square", 0.05f);
+                bool primeira = !GameSettings.Played;
+                GameSettings.SetPlayed(true);
+                if (primeira) { aposHistoria = AppEntry.Screen.Tutorial; ComecaAbertura(); } // nunca jogou: ve a historia e depois o tutorial
+                else IrPara(AppEntry.Screen.Tutorial);
+            }
             else if (nome == "opcoes") { SomRetro.Tom(300f, 0.08f, "square", 0.05f); modo = Modo.Opcoes; }
             else if (nome == "creditos") { SomRetro.Tom(300f, 0.08f, "square", 0.05f); modo = Modo.Creditos; }
         }
@@ -519,12 +527,13 @@ namespace BananaRoulette
         }
 
         // O macaco de mostra fica calmo, para dar para ver o rosto e os acessorios: so faz o malabarismo leve com a
-        // bomba. O nervoso aparece no suor, que aumenta com o pavio. Quando falta pouco ele joga a bomba para o alto,
-        // ela estoura la em cima, ele relaxa e outra cai na mao. Nenhum grito aqui: so pavio, vento e o estouro.
+        // bomba. O nervoso aparece no suor, que aumenta com o pavio. Quando falta pouco ele joga a bomba para o lado,
+        // ela estoura no chao (clarao, tremor da tela), ele se encolhe e cobre a cabeca; depois outra cai na mao.
         BananaCarrier pavioDaMostra;
-        int faseMostra;            // 0 segurando, 1 bomba subindo, 2 esperando a nova, 3 nova caindo
-        float queimaMostra, tMostra, proxEstalo;
+        int faseMostra;            // 0 segurando, 1 bomba voando, 2 se protegendo, 3 nova caindo
+        float queimaMostra, tMostra, proxEstalo, tremorMostra;
         Vector3 jogouDe;
+        static readonly Vector3 OndeEstoura = new Vector3(-7.4f, 0.5f, 5.2f); // ao lado dele, do lado que a camera mostra
 
         void CicloDaMostra(float dt)
         {
@@ -547,34 +556,37 @@ namespace BananaRoulette
                 if (queimaMostra >= 0.9f)
                 {
                     faseMostra = 1; tMostra = 0f;
-                    mostra.Tocar("jogaCima");
-                    SomRetro.Ruido(0.4f, 0.12f, 800f, "bandpass", 0.25f);
+                    mostra.Tocar(mostra.transform.InverseTransformPoint(W(OndeEstoura)).x < 0f ? "jogaE" : "jogaD");
+                    SomRetro.Ruido(0.4f, 0.14f, 800f, "bandpass", 0.15f);
                 }
             }
             else if (faseMostra == 1)
             {
-                // a bomba fica na mao ate o braco subir (0,3 s) e dali segue reto para o alto, perdendo forca
-                const float solta = 0.3f, sobe = 0.75f;
+                // a bomba fica na mao durante o recolhimento do braco e so entao sai, em arco, para o lado
+                const float solta = 0.16f, voo = 0.7f;
                 if (tMostra < solta) { jogouDe = mostra.PontoMaco.position; return; }
                 pavioDaMostra.SeguirPonto(null);
                 mostra.Suor = 0f;
-                float k = Mathf.Clamp01((tMostra - solta) / sobe);
-                Vector3 p = jogouDe + Vector3.up * (6.5f * e * (1f - (1f - k) * (1f - k)));
+                float k = Mathf.Clamp01((tMostra - solta) / voo);
+                Vector3 p = Vector3.Lerp(jogouDe, W(OndeEstoura), k);
+                p.y += Mathf.Sin(k * Mathf.PI) * 4.5f * e;
                 bombaMostra.transform.position = p;
-                bombaMostra.transform.Rotate(Vector3.forward, 500f * dt, Space.Self);
+                bombaMostra.transform.Rotate(Vector3.forward, 700f * dt, Space.Self);
                 if (k >= 1f)
                 {
-                    Explosao.Criar(p, 0.45f);
-                    SomRetro.Ruido(0.6f, 0.4f, 180f, "lowpass");
-                    SomRetro.Tom(90f, 0.45f, "sine", 0.35f, 35f);
+                    Explosao.Criar(W(OndeEstoura), 0.7f);
+                    SomRetro.Ruido(0.7f, 0.55f, 180f, "lowpass");
+                    SomRetro.Tom(90f, 0.5f, "sine", 0.45f, 35f);
+                    tremorMostra = 1f;
                     bombaMostra.SetActive(false);
+                    mostra.Tocar("protege");
                     mostra.Laco("parado");
                     faseMostra = 2; tMostra = 0f;
                 }
             }
             else if (faseMostra == 2)
             {
-                if (tMostra > 1.6f)
+                if (tMostra > 1.5f)
                 {
                     // outra bomba vem do alto
                     faseMostra = 3; tMostra = 0f; queimaMostra = 0f;
@@ -625,7 +637,8 @@ namespace BananaRoulette
             SomRetro.Tom(300f, 0.08f, "square", 0.05f);
         }
 
-        void ComecaPartida() { jaCarimbou = true; IrPara(AppEntry.Screen.Game); }
+        AppEntry.Screen aposHistoria = AppEntry.Screen.Game; // para onde a historia leva quando acaba: partida ou tutorial
+        void ComecaPartida() { jaCarimbou = true; var destino = aposHistoria; aposHistoria = AppEntry.Screen.Game; IrPara(destino); }
 
         // ------------------------------------------------------------------ cena unica: a partida nasce e some aqui dentro
 
@@ -849,6 +862,8 @@ namespace BananaRoulette
             if (noMenu)
             {
                 float bate = modo == Modo.Carimbo && r >= 1f ? Mathf.Max(0f, 1f - (r - 1f) / 0.3f) : 0f;
+                tremorMostra = Mathf.Max(0f, tremorMostra - dt / 0.45f);
+                bate = Mathf.Max(bate, tremorMostra); // a bomba do macaco de mostra estourou
                 Vector3 p = camPos;
                 p += cam.transform.right * ((Mathf.Sin(r * 0.5f) * 0.35f + Mathf.Sin(r * 70f) * 0.12f * bate) * e);
                 p.y += (Mathf.Sin(r * 0.37f) * 0.12f + Mathf.Cos(r * 83f) * 0.12f * bate) * e;

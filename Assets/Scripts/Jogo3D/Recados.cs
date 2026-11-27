@@ -111,7 +111,8 @@ namespace BananaRoulette
             int alvo = portador();
             if (alvo == de.Index) alvo = quemPassou();
             MonkeySlot para = alvo >= 0 && alvo < slots.Count && alvo != de.Index && slots[alvo].IsAlive ? slots[alvo] : null;
-            StartCoroutine(Voa(de, para, Mathf.Clamp(emoji, 0, Quantos - 1)));
+            // O balao fica em cima de quem mandou: voando ate o outro, um emoji tampava o do vizinho.
+            StartCoroutine(Voa(de, null, Mathf.Clamp(emoji, 0, Quantos - 1)));
             Som(emoji);
         }
 

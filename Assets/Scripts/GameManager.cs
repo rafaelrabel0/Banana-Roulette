@@ -54,6 +54,74 @@ namespace BananaRoulette
         public static bool EntradaCurta;
 
         private float _proximaOferta; // um poder so volta a aparecer depois de um intervalo
+        private GameObject _itemOferta; // o objeto do poder oferecido, no chao na frente de quem esta com a bomba
+        private float _ofertaAte;       // quando a bombinha dele estoura
+        private const float PrazoDoPoder = 6f;
+
+        private static Vector3 NoChao(Vector3 v) { v.y = 0f; return v; }
+
+        // O macaco do fundo joga o objeto do poder, amarrado numa banana de dinamite, para a frente de quem esta com a bomba.
+        private IEnumerator EntregaItem(PowerUp p, MonkeySlot holder)
+        {
+            float esc = holder.Visual != null ? holder.Visual.transform.localScale.x : 0.25f;
+            var item = ItemPoder.Criar(p, null, esc * 1.25f);
+            if (item == null) yield break;
+            SomeOferta(false);
+            _itemOferta = item;
+            Vector3 chao = NoChao(holder.transform.position + holder.transform.forward * 1.8f);
+            Vector3 de = chao + Vector3.up * 8f;
+            if (Lancador != null && Lancador.PontoMaco != null)
+            {
+                Vector3 rumo = NoChao(chao - Lancador.transform.position);
+                if (rumo.sqrMagnitude > 0.001f) Lancador.transform.rotation = Quaternion.LookRotation(rumo);
+                Lancador.Tocar("jogaFrente");
+                de = Lancador.PontoMaco.position;
+            }
+            item.transform.position = de;
+            SomRetro.Ruido(0.35f, 0.12f, 900f, "bandpass", 0.1f);
+            for (float t = 0f; t < 1f && item != null; t += Time.deltaTime / 0.75f)
+            {
+                Vector3 q = Vector3.Lerp(de, chao, t); q.y += Mathf.Sin(t * Mathf.PI) * 5f;
+                item.transform.position = q;
+                item.transform.Rotate(0f, 500f * Time.deltaTime, 0f);
+                yield return null;
+            }
+            if (item != null) { item.transform.position = chao; SomRetro.Tom(240f, 0.07f, "sine", 0.1f, 150f); }
+        }
+
+        // Tira o objeto oferecido de cena. pegou = foi para o lado do macaco; senao a bombinha dele estoura.
+        private void SomeOferta(bool pegou)
+        {
+            if (_itemOferta == null) return;
+            GameObject item = _itemOferta; _itemOferta = null;
+            if (!pegou)
+            {
+                Explosao.Criar(item.transform.position + Vector3.up * 0.3f, 0.3f);
+                SomRetro.Ruido(0.25f, 0.3f, 300f, "lowpass");
+            }
+            Destroy(item);
+        }
+
+        // Quem usou mostra o objeto: ele sai do lado do macaco e vai ate o alvo (ataque) ou sobe na frente dele (ajuda).
+        private IEnumerator MostraUso(PowerUp p, MonkeySlot quem, MonkeySlot alvo, bool ataque)
+        {
+            float esc = quem.Visual != null ? quem.Visual.transform.localScale.x : 0.25f;
+            var item = ItemPoder.Criar(p, null, esc * 1.25f);
+            if (item == null) yield break;
+            Vector3 de = quem.LugarDoItem;
+            Vector3 ate = ataque ? alvo.transform.position + Vector3.up * 3.4f : quem.transform.position + quem.transform.forward * 0.9f + Vector3.up * 3.6f;
+            for (float t = 0f; t < 1f && item != null; t += Time.deltaTime / (ataque ? 0.5f : 0.4f))
+            {
+                Vector3 q = Vector3.Lerp(de, ate, t); q.y += Mathf.Sin(t * Mathf.PI) * (ataque ? 2.5f : 0.6f);
+                item.transform.position = q;
+                item.transform.Rotate(0f, 600f * Time.deltaTime, 0f);
+                yield return null;
+            }
+            if (item == null) yield break;
+            if (ataque) { Explosao.Criar(ate, 0.25f); if (_shake != null) _shake.Shake(0.12f, 0.12f); }
+            else yield return new WaitForSeconds(0.5f);
+            Destroy(item);
+        }
 
         // --- poderes ---
         private PowerUp _oferta = PowerUp.Nenhum;      // o poder oferecido no turno atual
@@ -134,7 +202,8 @@ namespace BananaRoulette
             quem.Guardado = PowerUp.Nenhum;
             MostraInventario();
             bool ataque = PowerUps.EhAtaque(p);
-            _hud.SetStatus(QuemE(quem) + ": " + PowerUps.Nome(p).ToUpperInvariant() + (ataque ? T(" EM ", " ON ") + QuemE(alvo) : "") + "!",
+            StartCoroutine(MostraUso(p, quem, alvo, ataque));
+            _hud.SetStatus(QuemE(quem) + T(" USOU ", " USED ") + PowerUps.Nome(p).ToUpperInvariant() + (ataque ? T(" EM ", " ON ") + QuemE(alvo) : "") + "!",
                 ataque ? Palette.DynamiteRed : new Color(0.45f, 0.92f, 1f));
             if (ataque) { SomRetro.Tom(520f, 0.09f, "sawtooth", 0.1f, 260f); SomRetro.Tom(390f, 0.14f, "sawtooth", 0.1f, 190f, 0.1f); }
             else { SomRetro.Tom(660f, 0.08f, "square", 0.08f); SomRetro.Tom(880f, 0.08f, "square", 0.08f, 0f, 0.09f); SomRetro.Tom(1320f, 0.14f, "square", 0.08f, 0f, 0.18f); }
@@ -296,14 +365,7 @@ namespace BananaRoulette
                 // a camera chega, o macaco do fundo faz um malabarismo e joga a bomba para o jogador
                 yield return new WaitForSeconds(1.7f);
                 Lancador.Laco("olhando");
-                Lancador.Tocar(Lancador.transform.InverseTransformPoint(_slots[_holderIndex].transform.position).x < 0f ? "jogaE" : "jogaD");
-                _slots[_holderIndex].Receber();
-                SomRetro.Grito(820f, 520f, 0.25f, 0.4f);
-                SomRetro.Ruido(0.5f, 0.16f, 800f, "bandpass", 0.15f);
-                yield return new WaitForSeconds(0.16f); // a bomba sai da mao no meio do gesto
-                _banana.SeguirPonto(null);
-                yield return _banana.FlyTo(_slots[_holderIndex], 1.05f, 7f);
-                SomRetro.Grito(600f, 950f, 0.14f, 0.45f);
+                yield return LancadorJoga(_slots[_holderIndex], 1.05f, 7f);
                 _banana.SnapTo(_slots[_holderIndex]);
                 yield return new WaitForSeconds(0.3f);
             }
@@ -389,12 +451,14 @@ namespace BananaRoulette
                 holder.Guardado = _oferta;
                 Trace(QuemE(holder) + " pegou o poder " + _oferta);
                 _oferta = PowerUp.Nenhum;
+                SomeOferta(true);
                 if (holder.IsHuman) { _hud.HidePowerUp(); MostraInventario(); }
                 SomRetro.Tom(784f, 0.08f, "square", 0.08f); SomRetro.Tom(1175f, 0.16f, "square", 0.08f, 0f, 0.09f);
             };
             solver.OnPowerUpLost += () =>
             {
                 _oferta = PowerUp.Nenhum;
+                SomeOferta(false);
                 if (holder.IsHuman) _hud.HidePowerUp();
             };
 
@@ -404,6 +468,7 @@ namespace BananaRoulette
             // Poder: so aparece para quem esta com a bomba e nao esta guardando outro. A primeira tecla dele
             // nunca e igual a primeira da bomba, para a primeira tecla apertada dizer qual dos dois ele escolheu.
             _oferta = PowerUp.Nenhum;
+            SomeOferta(false); // o do turno anterior, se ninguem pegou
             _hud.HidePowerUp();
             // De vez em quando, nao a cada turno: depois de aparecer um, o proximo demora.
             if (holder.Guardado == PowerUp.Nenhum && Time.time >= _proximaOferta && Random.value < 0.4f)
@@ -413,12 +478,16 @@ namespace BananaRoulette
                 var seqPoder = SequenceGenerator.Generate(3);
                 if (seqPoder[0] == sequence[0]) seqPoder[0] = (ArrowDirection)(((int)seqPoder[0] + 1) % 4);
                 solver.Oferecer(seqPoder);
+                _ofertaAte = Time.time + PrazoDoPoder;
+                StartCoroutine(EntregaItem(_oferta, holder));
                 if (holder.IsHuman && !memoryRound) _hud.ShowPowerUp(PowerUps.Nome(_oferta), seqPoder);
             }
 
             bool hintShown = false;
             while (!_turnResolved && !_fuseEnded)
             {
+                // o poder tem prazo: a bombinha dele estoura e ele se perde
+                if (_oferta != PowerUp.Nenhum && Time.time >= _ofertaAte) solver.CancelarOferta();
                 if (holder.IsHuman && !hintShown)
                 {
                     var player = solver as PlayerInputHandler;
@@ -513,6 +582,31 @@ namespace BananaRoulette
             yield return _banana.FlyTo(_slots[nextIndex], _config.passFlightSeconds);
         }
 
+        // O macaco do fundo vira o corpo para quem vai receber e joga a bomba de frente. Assim, na tela de cada
+        // jogador (cada um ve a roda das costas do proprio macaco), a bomba que e para ele vem reta.
+        private IEnumerator LancadorJoga(MonkeySlot alvo, float voo, float altura)
+        {
+            Transform corpo = Lancador.transform;
+            Vector3 rumo = alvo.transform.position - corpo.position; rumo.y = 0f;
+            Quaternion de = corpo.rotation, ate = rumo.sqrMagnitude > 0.001f ? Quaternion.LookRotation(rumo) : de;
+            _banana.UpdateFuseVisual(0f);
+            _banana.SeguirPonto(Lancador.PontoMaco);
+            for (float t = 0f; t < 1f; t += Time.deltaTime / 0.3f)
+            {
+                corpo.rotation = Quaternion.Slerp(de, ate, t * t * (3f - 2f * t));
+                yield return null;
+            }
+            corpo.rotation = ate;
+            Lancador.Tocar("jogaFrente");
+            alvo.Receber();
+            SomRetro.Grito(820f, 520f, 0.25f, 0.4f);              // o grito de quem se livra dela
+            SomRetro.Ruido(0.5f, 0.16f, 800f, "bandpass", 0.15f);  // a bomba no ar
+            yield return new WaitForSeconds(0.17f);                // sai da mao no meio do gesto
+            _banana.SeguirPonto(null);
+            yield return _banana.FlyTo(alvo, voo, altura);
+            SomRetro.Grito(600f, 950f, 0.14f, 0.45f);
+        }
+
         private IEnumerator RunExplosion()
         {
             Current = State.Explosion;
@@ -526,6 +620,8 @@ namespace BananaRoulette
             }
 
             _hud.ClearTurnVisuals();
+            SomeOferta(false);
+            _oferta = PowerUp.Nenhum;
             _banana.gameObject.SetActive(false);
 
             if (_shake != null) _shake.Shake(0.45f, 0.55f);
@@ -567,19 +663,7 @@ namespace BananaRoulette
                     _banana.gameObject.SetActive(true);
 
                     // A bomba nova nao aparece do nada: o macaco la atras, cercado de bombas acesas, joga mais uma para a roda.
-                    if (Lancador != null && Lancador.PontoMaco != null)
-                    {
-                        _banana.UpdateFuseVisual(0f);
-                        _banana.SeguirPonto(Lancador.PontoMaco);
-                        Lancador.Tocar(Lancador.transform.InverseTransformPoint(_slots[_holderIndex].transform.position).x < 0f ? "jogaE" : "jogaD");
-                        _slots[_holderIndex].Receber();
-                        SomRetro.Grito(820f, 520f, 0.25f, 0.4f);              // o grito de quem se livra dela
-                        SomRetro.Ruido(0.5f, 0.16f, 800f, "bandpass", 0.1f);  // a bomba no ar
-                        yield return new WaitForSeconds(0.16f);
-                        _banana.SeguirPonto(null);
-                        yield return _banana.FlyTo(_slots[_holderIndex], 0.95f, 6.5f);
-                        SomRetro.Grito(600f, 950f, 0.14f, 0.45f);
-                    }
+                    if (Lancador != null && Lancador.PontoMaco != null) yield return LancadorJoga(_slots[_holderIndex], 0.95f, 6.5f);
                     _banana.SnapTo(_slots[_holderIndex]);
                 }
             }

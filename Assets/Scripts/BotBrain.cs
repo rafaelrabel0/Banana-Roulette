@@ -42,6 +42,12 @@ namespace BananaRoulette
             _nextArrowTime = Time.time + _secondsPerArrow * _teclasDoPoder * Random.Range(0.9f, 1.2f);
         }
 
+        public override void CancelarOferta()
+        {
+            if (_buscandoPoder) { _buscandoPoder = false; ScheduleNextArrow(); }
+            base.CancelarOferta();
+        }
+
         private void ScheduleNextArrow()
         {
             // Pequena variacao a cada seta para o ritmo nao soar mecanico.

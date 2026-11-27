@@ -19,6 +19,8 @@ namespace BananaRoulette
         private Phase _phase;
         private float _lockoutUntil;
         private int _noPoder = -1; // quantas teclas da sequencia do poder ja foram; -1 = nao esta nela
+
+        public override void CancelarOferta() { _noPoder = -1; base.CancelarOferta(); }
         private TuningConfig _config;
 
         public void Configure(TuningConfig config)
