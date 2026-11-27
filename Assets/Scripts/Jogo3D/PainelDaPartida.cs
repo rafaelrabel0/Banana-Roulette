@@ -23,7 +23,7 @@ namespace BananaRoulette
         RenderTexture fotoBanana;
         readonly List<RawImage> bananas = new List<RawImage>(), poderes = new List<RawImage>();
         Text rotulo;
-        Texture2D texPoderes;
+        readonly Dictionary<PowerUp, RenderTexture> fotosDosItens = new Dictionary<PowerUp, RenderTexture>();
         int vivos = -1, vidas = -1, bolsa = -1;
 
         public static PainelDaPartida Criar(Transform hud, List<MonkeySlot> slots)
@@ -53,22 +53,13 @@ namespace BananaRoulette
             molduras = new RectTransform[slots.Count]; rostos = new RawImage[slots.Count];
             for (int i = 0; i < slots.Count; i++)
             {
-                var m = new GameObject("Rosto " + (i + 1), typeof(RectTransform), typeof(Image));
-                molduras[i] = Canto(m, transform, false, Vector2.zero, 88f);
-                var cor = m.GetComponent<Image>();
-                cor.color = slots[i].IsHuman ? new Color(0.98f, 0.80f, 0.22f) : new Color(0.14f, 0.09f, 0.05f);
-                cor.raycastTarget = false;
-
-                var fundo = new GameObject("Fundo", typeof(RectTransform), typeof(Image));
-                fundo.transform.SetParent(m.transform, false);
-                var brt = (RectTransform)fundo.transform;
-                brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one; brt.offsetMin = new Vector2(5f, 5f); brt.offsetMax = new Vector2(-5f, -5f);
-                var bi = fundo.GetComponent<Image>(); bi.color = new Color(1f, 0.97f, 0.91f); bi.raycastTarget = false;
+                var m = new GameObject("Rosto " + (i + 1), typeof(RectTransform));
+                molduras[i] = Canto(m, transform, false, Vector2.zero, slots[i].IsHuman ? 124f : 100f);
 
                 var f = new GameObject("Emoji", typeof(RectTransform), typeof(RawImage));
                 f.transform.SetParent(m.transform, false);
                 var frt = (RectTransform)f.transform;
-                frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one; frt.offsetMin = new Vector2(-2f, -6f); frt.offsetMax = new Vector2(2f, -2f);
+                frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one; frt.offsetMin = frt.offsetMax = Vector2.zero;
                 rostos[i] = f.GetComponent<RawImage>(); rostos[i].raycastTarget = false; rostos[i].uvRect = RostoDoMacaco.Recorte(0, 0);
                 rostos[i].enabled = false;
             }
@@ -78,28 +69,26 @@ namespace BananaRoulette
             for (int i = 0; i < 3; i++)
             {
                 var b = new GameObject("Banana de vida " + (i + 1), typeof(RectTransform), typeof(RawImage));
-                Canto(b, transform, false, new Vector2(26f + i * 104f, 118f), 100f);
+                Canto(b, transform, false, new Vector2(22f + i * 124f, 130f), 124f);
                 var img = b.GetComponent<RawImage>(); img.texture = fotoBanana; img.raycastTarget = false;
                 bananas.Add(img);
             }
 
             // poderes guardados
-            texPoderes = Resources.Load<Texture2D>("Jogo/poderes");
-            if (texPoderes != null) texPoderes.filterMode = FilterMode.Point;
             float x = -34f;
             for (int i = 0; i < MonkeySlot.MaxNaBolsa; i++)
             {
-                float lado = i == 0 ? 108f : 70f;
+                float lado = i == 0 ? 150f : 100f;
                 var g = new GameObject("Poder " + (i + 1), typeof(RectTransform), typeof(RawImage));
                 Canto(g, transform, true, new Vector2(x, 26f), lado);
                 x -= lado + 10f;
-                var img = g.GetComponent<RawImage>(); img.texture = texPoderes; img.raycastTarget = false;
+                var img = g.GetComponent<RawImage>(); img.raycastTarget = false;
                 g.SetActive(false);
                 poderes.Add(img);
             }
             rotulo = UiFactory.CreateText(transform, "Poder da vez", "", 24, TextAnchor.LowerRight, Color.white);
             var o = rotulo.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.08f, 0.05f, 0.03f, 0.95f); o.effectDistance = new Vector2(2f, -2f);
-            UiFactory.Anchor(rotulo, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-34f, 140f), new Vector2(900f, 32f));
+            UiFactory.Anchor(rotulo, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-34f, 180f), new Vector2(900f, 32f));
 
             StartCoroutine(Prepara());
         }
@@ -116,29 +105,50 @@ namespace BananaRoulette
             FotografaBanana();
         }
 
-        // A banana do painel e a mesma banana 3D do chao, fotografada uma vez, na diagonal, com fundo transparente.
-        void FotografaBanana()
+        // Fotografa um objeto 3D na diagonal, com fundo transparente, enquadrando pelo tamanho dele. O objeto e posto
+        // la embaixo do chao so para a foto e destruido em seguida.
+        static void Fotografa(GameObject coisa, RenderTexture tela, Quaternion giro)
         {
-            Vector3 longe = new Vector3(0f, -300f, 0f);
-            GameObject banana = MonkeySlot.NovaBanana();
-            banana.transform.position = longe;
-            banana.transform.rotation = Quaternion.Euler(-28f, 40f, 24f);
+            coisa.transform.position = new Vector3(0f, -300f, 0f);
+            coisa.transform.rotation = giro;
+            var rs = coisa.GetComponentsInChildren<Renderer>();
+            if (rs.Length == 0) { Destroy(coisa); return; }
+            Bounds caixa = rs[0].bounds;
+            foreach (Renderer r in rs) caixa.Encapsulate(r.bounds);
 
-            var go = new GameObject("Camera da banana");
+            var go = new GameObject("Camera da foto");
             var cam = go.AddComponent<Camera>();
             cam.enabled = false;
-            cam.orthographic = true; cam.orthographicSize = 0.46f;
+            cam.orthographic = true; cam.orthographicSize = Mathf.Max(caixa.extents.x, caixa.extents.y * 0.8f + caixa.extents.z * 0.6f) * 0.6f; // 0,6: medido na tela, a foto saia com o objeto pela metade do quadro
             cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0f, 0f, 0f, 0f);
-            cam.nearClipPlane = 0.05f; cam.farClipPlane = 8f; cam.allowHDR = false; cam.allowMSAA = false;
-            Vector3 centro = banana.transform.TransformPoint(new Vector3(0f, 0.17f, 0.12f));
+            cam.nearClipPlane = 0.05f; cam.farClipPlane = 60f; cam.allowHDR = false; cam.allowMSAA = false;
             Vector3 de = new Vector3(0f, 0.75f, -1f).normalized;
-            cam.transform.position = centro + de * 4f;
+            cam.transform.position = caixa.center + de * 20f;
             cam.transform.rotation = Quaternion.LookRotation(-de, Vector3.up);
-            cam.targetTexture = fotoBanana;
+            cam.targetTexture = tela;
             cam.Render();
             cam.targetTexture = null;
             Destroy(go);
-            Destroy(banana);
+            coisa.SetActive(false); // some ja: a destruicao so vale no fim do quadro e ele apareceria na foto seguinte
+            Destroy(coisa);
+        }
+
+        // A banana do painel e a mesma banana 3D do chao, na diagonal.
+        void FotografaBanana()
+        {
+            Fotografa(MonkeySlot.NovaBanana(), fotoBanana, Quaternion.Euler(-28f, 40f, 24f));
+        }
+
+        // O desenho de cada poder no painel e o proprio objeto 3D (banana, cantil, alicate...), fotografado uma vez.
+        Texture FotoDoItem(PowerUp p)
+        {
+            RenderTexture tela;
+            if (fotosDosItens.TryGetValue(p, out tela) && tela != null) return tela;
+            tela = new RenderTexture(192, 192, 16, RenderTextureFormat.ARGB32) { filterMode = FilterMode.Point };
+            fotosDosItens[p] = tela;
+            GameObject item = ItemPoder.Criar(p, null, 1f, ItemPoder.Parte.SoObjeto);
+            if (item != null) Fotografa(item, tela, Quaternion.Euler(0f, 205f, 0f));
+            return tela;
         }
 
         void Update()
@@ -151,12 +161,12 @@ namespace BananaRoulette
             if (marca != vivos)
             {
                 vivos = marca;
-                int n = 0;
+                int n = 0; float posX = 26f;
                 for (int i = 0; i < slots.Count; i++)
                 {
                     bool vivo = slots[i].IsAlive;
                     if (molduras[i].gameObject.activeSelf != vivo) molduras[i].gameObject.SetActive(vivo);
-                    if (vivo) molduras[i].anchoredPosition = new Vector2(34f + (n++) * 96f, 24f);
+                    if (vivo) { molduras[i].anchoredPosition = new Vector2(posX, 10f); posX += molduras[i].sizeDelta.x - 6f; n++; }
                 }
             }
 
@@ -177,11 +187,9 @@ namespace BananaRoulette
                 bolsa = b;
                 for (int i = 0; i < poderes.Count; i++)
                 {
-                    bool tem = i < eu.Bolsa.Count && texPoderes != null;
+                    bool tem = i < eu.Bolsa.Count;
                     poderes[i].gameObject.SetActive(tem);
-                    if (!tem) continue;
-                    int k = (int)eu.Bolsa[i] - 1;
-                    poderes[i].uvRect = new Rect((k % 4) / 4f, 1f - (k / 4 + 1) / 4f, 0.25f, 0.25f);
+                    if (tem) poderes[i].texture = FotoDoItem(eu.Bolsa[i]);
                 }
                 bool pt = Loc.Current == Language.Portuguese;
                 rotulo.text = eu.Bolsa.Count > 0 ? (pt ? "ESPAÇO: " : "SPACE: ") + PowerUps.Nome(eu.Bolsa[0]).ToUpperInvariant() : "";
@@ -191,6 +199,7 @@ namespace BananaRoulette
         void OnDestroy()
         {
             if (fotoBanana != null) fotoBanana.Release();
+            foreach (var t in fotosDosItens.Values) if (t != null) t.Release();
         }
     }
 }
