@@ -142,6 +142,7 @@ namespace BananaRoulette
                     Add(() => T("Óculos", "Glasses"), () => Aparencia.Oculo(GameSettings.Glasses).Nome, dir => GameSettings.SetGlasses(Roda(GameSettings.Glasses + dir, Aparencia.Oculos.Length)));
                     Add(() => T("Brinco", "Earring"), () => Aparencia.Brinco(GameSettings.Earring).Nome, dir => GameSettings.SetEarring(Roda(GameSettings.Earring + dir, Aparencia.Brincos.Length)));
                     Add(() => T("Bomba", "Bomb"), () => Aparencia.Bomba(GameSettings.Bomb).Nome, dir => GameSettings.SetBomb(Roda(GameSettings.Bomb + dir, Aparencia.Bombas.Length)));
+                    Add(() => T("Gracinha", "Emote"), () => Aparencia.Emote(GameSettings.Emote).Nome, dir => GameSettings.SetEmote(Roda(GameSettings.Emote + dir, Aparencia.Emotes.Length)));
                     break;
                 case "pausa":
                     // menu da partida, escrito no caixote ao lado da roda. A partida continua correndo.

@@ -53,6 +53,13 @@ namespace BananaRoulette
             new Item("podre", "Podre", "Rotten", 0x6B5226, 0x241B14)
         };
 
+        // Gracinhas (tecla E na partida). id = nome da animacao dentro do macaco-jogo.glb.
+        public static readonly Item[] Emotes =
+        {
+            new Item("vence", "Comemorar", "Cheer"), new Item("erro", "Chilique", "Tantrum"), new Item("olhando", "Tremedeira", "Shiver")
+        };
+        public static Item Emote(int i) { return Emotes[Volta(i, Emotes.Length)]; }
+
         static int Volta(int i, int n) { return ((i % n) + n) % n; }
         public static Item Pelo(int i) { return Pelos[Volta(i, Pelos.Length)]; }
         public static Item Chapeu(int i) { return Chapeus[Volta(i, Chapeus.Length)]; }

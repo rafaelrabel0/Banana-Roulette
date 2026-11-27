@@ -40,6 +40,7 @@ namespace BananaRoulette
         ClipeJ laco, umaVez;
         float tLaco, tUmaVez;
         bool seguraNoFim;
+        int voltasUmaVez = 1;
         float pulo;
         Vector3 posBase;
 
@@ -178,11 +179,11 @@ namespace BananaRoulette
         }
 
         /// <summary>Toca uma animacao de uma vez so. ficaNoFim = para no ultimo quadro (explosao).</summary>
-        public void Tocar(string nome, bool ficaNoFim = false)
+        public void Tocar(string nome, bool ficaNoFim = false, int voltas = 1)
         {
             ClipeJ c;
             if (!porNome.TryGetValue(nome, out c)) return;
-            umaVez = c; tUmaVez = 0f; seguraNoFim = ficaNoFim;
+            umaVez = c; tUmaVez = 0f; seguraNoFim = ficaNoFim; voltasUmaVez = Mathf.Max(1, voltas);
         }
 
         /// <summary>Pulinho curto por cima da animacao: usado a cada seta acertada.</summary>
@@ -212,7 +213,7 @@ namespace BananaRoulette
             if (umaVez != null)
             {
                 tUmaVez += dt;
-                if (tUmaVez >= umaVez.fim - umaVez.ini)
+                if (tUmaVez >= (umaVez.fim - umaVez.ini) * voltasUmaVez)
                 {
                     if (seguraNoFim) tUmaVez = umaVez.fim - umaVez.ini;
                     else { umaVez = null; tLaco = 0f; }
@@ -236,6 +237,7 @@ namespace BananaRoulette
             ClipeJ c = umaVez != null ? umaVez : laco;
             if (c == null) return;
             float local = umaVez != null ? tUmaVez : tLaco;
+            if (umaVez != null && voltasUmaVez > 1) local %= (umaVez.fim - umaVez.ini);
             // um fio antes do fim do trecho, para nao cair no primeiro quadro da animacao seguinte
             float t = Mathf.Min(c.ini + local, c.fim - 0.5f / dados.fps);
             estado.enabled = true; estado.weight = 1f; estado.time = t;

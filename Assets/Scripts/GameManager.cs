@@ -39,6 +39,11 @@ namespace BananaRoulette
         /// <summary>Ligado pelo bootstrap quando a partida tem o menu no caixote.</summary>
         public bool TemMenuDaPartida;
 
+        /// <summary>Lugar de quem esta com a bomba agora.</summary>
+        public int HolderIndex { get { return _holderIndex; } }
+        /// <summary>Lugar de quem passou a bomba por ultimo (-1 se ninguem).</summary>
+        public int LastPasserIndex { get { return _lastPasserIndex; } }
+
         /// <summary>O macaco la atras, que joga a bomba nova para a roda depois de cada explosao. Nulo = a bomba so aparece.</summary>
         public MacacoVisual Lancador;
 

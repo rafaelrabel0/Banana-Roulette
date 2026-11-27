@@ -115,6 +115,9 @@ namespace BananaRoulette
             }
         }
 
+        /// <summary>Verdadeiro enquanto a bomba esta na mao deste macaco.</summary>
+        public bool Holding { get { return _isHolding; } }
+
         public void SetHolding(bool holding)
         {
             _isHolding = holding;

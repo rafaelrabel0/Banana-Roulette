@@ -218,9 +218,16 @@ Guarda-se um por vez e **Espaço** usa. Há quatro de ajuda (vida extra, pavio m
 relâmpago) e cinco de ataque em quem está com a bomba (comandos invertidos, sequência dobrada, pavio curto,
 névoa, cola). Lista e regras em `Assets/Scripts/Jogo3D/PowerUps.cs`; efeitos em `GameManager.UsarPowerUp`.
 
+### Emojis e emotes
+
+Teclas **1 a 6** mandam um balão com uma carinha de macaco animada (riso, língua, bravo, choro, medo, sono) para
+quem está com a bomba. Tecla **E** faz o seu macaco fazer a gracinha escolhida em PERSONAGEM. Os bots também
+mandam emoji. Código em `Assets/Scripts/Jogo3D/Recados.cs`; as carinhas ficam em `Assets/Resources/Jogo/emojis.png`
+e são desenhadas na prévia por `__cena.exportaEmojis()`.
+
 ### O que ainda não veio
 
-- Emojis/emotes; modelos 3D dos power-ups.
+- Modelos 3D dos power-ups; gracinhas com animação própria; música gravada.
 - Música gravada, fumaça na explosão.
 
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.

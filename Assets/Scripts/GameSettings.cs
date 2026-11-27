@@ -24,6 +24,7 @@ namespace BananaRoulette
         private const string KeyGlasses = "br_glasses";
         private const string KeyEarring = "br_earring";
         private const string KeyBomb = "br_bomb";
+        private const string KeyEmote = "br_emote";
 
         public static float MusicVolume { get; private set; }
         public static float SfxVolume { get; private set; }
@@ -44,6 +45,8 @@ namespace BananaRoulette
         public static int Glasses { get; private set; }
         public static int Earring { get; private set; }
         public static int Bomb { get; private set; }
+        /// <summary>A gracinha escolhida (posicao em Aparencia.Emotes).</summary>
+        public static int Emote { get; private set; }
 
         /// <summary>Visual retro: tremor dos vertices.</summary>
         public static bool Wobble { get; private set; } = true;
@@ -67,6 +70,7 @@ namespace BananaRoulette
             Glasses = PlayerPrefs.GetInt(KeyGlasses, 0);
             Earring = PlayerPrefs.GetInt(KeyEarring, 0);
             Bomb = PlayerPrefs.GetInt(KeyBomb, 0);
+            Emote = PlayerPrefs.GetInt(KeyEmote, 0);
             VisualRetro.Pixel = Pixel;
             VisualRetro.Tremor = Wobble;
 
@@ -124,6 +128,7 @@ namespace BananaRoulette
         public static void SetGlasses(int value) { Glasses = value; Guarda(KeyGlasses, value); }
         public static void SetEarring(int value) { Earring = value; Guarda(KeyEarring, value); }
         public static void SetBomb(int value) { Bomb = value; Guarda(KeyBomb, value); }
+        public static void SetEmote(int value) { Emote = value; Guarda(KeyEmote, value); }
 
         private static void Guarda(string chave, int valor)
         {

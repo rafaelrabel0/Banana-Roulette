@@ -126,6 +126,11 @@ namespace BananaRoulette
                             () => gerente.BombaComJogador, () => AppEntry.GoTo(AppEntry.Screen.Menu));
                         _manager.TemMenuDaPartida = true;
                     }
+                    if (usar3D)
+                    {
+                        var gerenteDosRecados = _manager;
+                        Recados.Criar(slots, () => gerenteDosRecados.HolderIndex, () => gerenteDosRecados.LastPasserIndex, camera, _canvas.transform);
+                    }
                     _manager.StartMatch();
                     break;
 
