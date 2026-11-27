@@ -61,9 +61,15 @@ namespace BananaRoulette
         /// <summary>Disparado quando um erro queima pavio. Parametro: segundos queimados.</summary>
         public event Action<float> OnBurned;
 
+        private float _molhadoAte;
+
+        /// <summary>Pavio molhado: para de queimar por alguns segundos, sem perder o que ja queimou.</summary>
+        public void Molhar(float seconds) { _molhadoAte = Time.time + seconds; }
+
         private void Update()
         {
             if (!IsRunning) return;
+            if (Time.time < _molhadoAte) return;
 
             Remaining -= Time.deltaTime;
             if (Remaining <= 0f)

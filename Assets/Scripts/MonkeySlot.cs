@@ -12,6 +12,51 @@ namespace BananaRoulette
         public bool IsHuman { get; private set; }
         public bool IsAlive { get; private set; } = true;
 
+        /// <summary>Vidas que sobram. Cada explosao tira uma; no zero ele sai voando da roda.</summary>
+        public int Lives { get; private set; } = 2;
+        /// <summary>O poder que este macaco esta guardando (um por vez).</summary>
+        public PowerUp Guardado = PowerUp.Nenhum;
+
+        private readonly Transform[] _bolinhas = new Transform[4]; // 3 de vida + 1 do poder guardado
+
+        public void GanhaVida() { Lives = Mathf.Min(3, Lives + 1); }
+
+        /// <summary>Tira uma vida. Devolve verdadeiro se era a ultima.</summary>
+        public bool PerdeVida()
+        {
+            Lives = Mathf.Max(0, Lives - 1);
+            return Lives <= 0;
+        }
+
+        /// <summary>Explodiu mas ainda tem vida: cai para tras, pisca de preto e se levanta.</summary>
+        public void Chamuscar()
+        {
+            if (_visual == null) return;
+            _visual.Tocar("explode");
+            _visual.Piscar(new Color(0.08f, 0.07f, 0.06f));
+        }
+
+        private void MontaBolinhas()
+        {
+            var tinta = Shader.Find("BananaRoulette/Retro");
+            for (int i = 0; i < _bolinhas.Length; i++)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                go.name = i < 3 ? "Vida " + (i + 1) : "Poder guardado";
+                Destroy(go.GetComponent<Collider>());
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = i < 3 ? new Vector3(-0.34f + 0.34f * i, 3.55f, 0f) : new Vector3(0f, 4.0f, 0f); // acima de qualquer chapeu
+                go.transform.localScale = Vector3.one * (i < 3 ? 0.26f : 0.32f);
+                var r = go.GetComponent<Renderer>();
+                var m = new Material(tinta);
+                m.SetColor("_BaseColor", i < 3 ? new Color(0.92f, 0.22f, 0.2f) : new Color(0.25f, 0.85f, 0.95f));
+                m.SetFloat("_SemLuz", 1f);
+                r.sharedMaterial = m;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                _bolinhas[i] = go.transform;
+            }
+        }
+
         private Renderer _renderer;
         private Color _baseColor;
         private Vector3 _baseScale;
@@ -28,6 +73,7 @@ namespace BananaRoulette
         {
             _visual = visual;
             if (_visual != null && _renderer != null) _renderer.enabled = false;
+            if (_visual != null) MontaBolinhas();
         }
 
         public MacacoVisual Visual { get { return _visual; } }
@@ -76,6 +122,14 @@ namespace BananaRoulette
 
         private void Update()
         {
+            // bolinhas vermelhas = vidas; a azul em cima = tem poder guardado
+            for (int i = 0; i < _bolinhas.Length; i++)
+            {
+                if (_bolinhas[i] == null) continue;
+                bool liga = IsAlive && (i < 3 ? i < Lives : Guardado != PowerUp.Nenhum);
+                if (_bolinhas[i].gameObject.activeSelf != liga) _bolinhas[i].gameObject.SetActive(liga);
+            }
+
             if (!IsAlive) return;
 
             if (_visual != null)

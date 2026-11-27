@@ -111,6 +111,83 @@ namespace BananaRoulette
         /// <summary>Esconde ou mostra a fila de setas (o menu da partida esconde enquanto esta aberto).</summary>
         private bool _endShown, _endSuspended;
 
+        private RectTransform _puRow;
+        private Text _puLabel, _invText, _livesText;
+        private readonly List<KeyCapWidget> _puKeys = new List<KeyCapWidget>();
+
+        private Text NovoTexto(string nome, int tamanho, TextAnchor ancora, Color cor)
+        {
+            var t = UiFactory.CreateText(transform, nome, "", tamanho, ancora, cor);
+            var o = t.gameObject.AddComponent<Outline>();
+            o.effectColor = new Color(0.08f, 0.05f, 0.03f, 0.9f);
+            o.effectDistance = new Vector2(2.5f, -2.5f);
+            return t;
+        }
+
+        private void GarantePoder()
+        {
+            if (_puRow != null) return;
+            var go = new GameObject("PowerUpRow", typeof(RectTransform));
+            go.transform.SetParent(transform, false);
+            _puRow = go.GetComponent<RectTransform>();
+            _puRow.anchorMin = _puRow.anchorMax = _puRow.pivot = new Vector2(0.5f, 0.5f);
+            _puRow.sizeDelta = new Vector2(900f, 60f);
+
+            _puLabel = NovoTexto("PowerUpLabel", 28, TextAnchor.MiddleCenter, new Color(0.45f, 0.92f, 1f));
+            UiFactory.Anchor(_puLabel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1400f, 40f));
+
+            _invText = NovoTexto("Inventario", 28, TextAnchor.LowerLeft, new Color(0.45f, 0.92f, 1f));
+            UiFactory.Anchor(_invText, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(34f, 26f), new Vector2(1300f, 44f));
+
+            _livesText = NovoTexto("Vidas", 30, TextAnchor.UpperLeft, new Color(1f, 0.45f, 0.4f));
+            UiFactory.Anchor(_livesText, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(34f, -158f), new Vector2(520f, 44f));
+        }
+
+        /// <summary>Mostra, acima da fila da bomba, o poder oferecido neste turno e as teclas para pega-lo.</summary>
+        public void ShowPowerUp(string nome, List<ArrowDirection> sequence)
+        {
+            GarantePoder();
+            HidePowerUp();
+            Vector2 baseRow = _keyRow != null ? _keyRow.anchoredPosition : Vector2.zero;
+            _puRow.anchoredPosition = baseRow + new Vector2(0f, 138f);
+            _puLabel.rectTransform.anchoredPosition = baseRow + new Vector2(0f, 196f);
+            _puLabel.text = (Loc.Current == Language.Portuguese ? "PODER: " : "POWER-UP: ") + nome.ToUpperInvariant();
+            const float tam = 58f, passo = 68f;
+            float largura = (sequence.Count - 1) * passo;
+            for (int i = 0; i < sequence.Count; i++)
+            {
+                var key = KeyCapWidget.Create(_puRow, sequence[i], tam);
+                key.GetComponent<RectTransform>().anchoredPosition = new Vector2(-largura * 0.5f + i * passo, 0f);
+                key.SetState(i == 0 ? KeyCapWidget.State.Current : KeyCapWidget.State.Pending);
+                _puKeys.Add(key);
+            }
+        }
+
+        public void PowerUpHit(int progress)
+        {
+            for (int i = 0; i < _puKeys.Count; i++)
+            {
+                if (_puKeys[i] == null) continue;
+                _puKeys[i].SetState(i < progress ? KeyCapWidget.State.Hit : i == progress ? KeyCapWidget.State.Current : KeyCapWidget.State.Pending);
+            }
+        }
+
+        public void HidePowerUp()
+        {
+            for (int i = 0; i < _puKeys.Count; i++) if (_puKeys[i] != null) Destroy(_puKeys[i].gameObject);
+            _puKeys.Clear();
+            if (_puLabel != null) _puLabel.text = "";
+        }
+
+        /// <summary>Canto de baixo: o poder guardado e a tecla para usar. Texto vazio esconde.</summary>
+        public void SetInventory(string texto) { GarantePoder(); _invText.text = texto; }
+
+        public void SetLives(int vidas)
+        {
+            GarantePoder();
+            _livesText.text = (Loc.Current == Language.Portuguese ? "VIDAS: " : "LIVES: ") + vidas;
+        }
+
         /// <summary>
         /// Tira a tela de fim de partida da frente (sem esquecer que ela existe) enquanto o menu da partida
         /// esta aberto, e devolve quando ele fecha.
@@ -125,6 +202,8 @@ namespace BananaRoulette
         {
             if (_keyRow != null) _keyRow.gameObject.SetActive(visible);
             if (_hintText != null) _hintText.gameObject.SetActive(visible);
+            if (_puRow != null) _puRow.gameObject.SetActive(visible);
+            if (_puLabel != null) _puLabel.gameObject.SetActive(visible);
         }
 
         public void Layout3D()

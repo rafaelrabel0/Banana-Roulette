@@ -14,6 +14,8 @@ namespace BananaRoulette
         private MonkeySlot _slot;
         private float _secondsPerArrow;
         private float _nextArrowTime;
+        private bool _buscandoPoder;
+        private int _teclasDoPoder;
 
         public void Configure(TuningConfig config)
         {
@@ -26,19 +28,51 @@ namespace BananaRoulette
         public override void BeginTurn(List<ArrowDirection> sequence, int lastPasserIndex)
         {
             base.BeginTurn(sequence, lastPasserIndex);
+            _buscandoPoder = false;
             ScheduleNextArrow();
+        }
+
+        // Metade das vezes o bot resolve pegar o poder antes de mexer na bomba. Custa o tempo de digitar as teclas dele.
+        public override void Oferecer(List<ArrowDirection> sequenciaDoPoder)
+        {
+            base.Oferecer(sequenciaDoPoder);
+            if (sequenciaDoPoder == null || Random.value > 0.5f) return;
+            _buscandoPoder = true;
+            _teclasDoPoder = sequenciaDoPoder.Count;
+            _nextArrowTime = Time.time + _secondsPerArrow * _teclasDoPoder * Random.Range(0.9f, 1.2f);
         }
 
         private void ScheduleNextArrow()
         {
             // Pequena variacao a cada seta para o ritmo nao soar mecanico.
-            _nextArrowTime = Time.time + _secondsPerArrow * Random.Range(0.8f, 1.2f);
+            _nextArrowTime = Time.time + _secondsPerArrow * Mathf.Max(1f, Lentidao) * Random.Range(0.8f, 1.2f);
         }
 
         private void Update()
         {
             if (!IsActive) return;
+            if (Time.time < TravadoAte) return; // ataque "cola"
             if (Time.time < _nextArrowTime) return;
+
+            if (_buscandoPoder)
+            {
+                _buscandoPoder = false;
+                if (Random.value < _config.botErrorChance * 2f)
+                {
+                    RaisePowerUpLost();
+                    RaiseMiss();
+                    _nextArrowTime = Time.time + _config.errorLockoutSeconds + _secondsPerArrow;
+                }
+                else
+                {
+                    RaisePowerUpGot();
+                    ScheduleNextArrow();
+                }
+                return;
+            }
+
+            // a sequencia pode ter encolhido no meio do turno (meia sequencia)
+            if (Progress >= Sequence.Count) { RaisePass(ChooseSide()); return; }
 
             bool missed = Random.value < _config.botErrorChance;
 

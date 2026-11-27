@@ -18,6 +18,7 @@ namespace BananaRoulette
 
         private Phase _phase;
         private float _lockoutUntil;
+        private int _noPoder = -1; // quantas teclas da sequencia do poder ja foram; -1 = nao esta nela
         private TuningConfig _config;
 
         public void Configure(TuningConfig config)
@@ -30,6 +31,7 @@ namespace BananaRoulette
             base.BeginTurn(sequence, lastPasserIndex);
             _phase = Phase.Typing;
             _lockoutUntil = 0f;
+            _noPoder = -1;
         }
 
         private void Update()
@@ -37,12 +39,14 @@ namespace BananaRoulette
             if (!IsActive) return;
             if (PausaNoCaixote.Aberta) return; // com o menu da partida aberto, as teclas mexem no menu
             if (Time.time < _lockoutUntil) return;
+            if (Time.time < TravadoAte) return; // ataque "cola"
 
             ArrowDirection pressed;
             if (!TryReadArrow(out pressed)) return;
 
             if (_phase == Phase.Typing)
             {
+                if (Invertido) pressed = Oposta(pressed); // ataque "comandos invertidos"
                 HandleTyping(pressed);
             }
             else
@@ -51,8 +55,52 @@ namespace BananaRoulette
             }
         }
 
+        private static ArrowDirection Oposta(ArrowDirection d)
+        {
+            switch (d)
+            {
+                case ArrowDirection.Left: return ArrowDirection.Right;
+                case ArrowDirection.Right: return ArrowDirection.Left;
+                case ArrowDirection.Up: return ArrowDirection.Down;
+                default: return ArrowDirection.Up;
+            }
+        }
+
+        protected override void AoTrocarSequencia()
+        {
+            if (Sequence != null && Progress >= Sequence.Count) _phase = Phase.ChoosingSide;
+            else _phase = Phase.Typing;
+        }
+
         private void HandleTyping(ArrowDirection pressed)
         {
+            // No meio da sequencia do poder: ou acerta a proxima, ou perde o poder (e isso conta como erro).
+            if (_noPoder >= 0)
+            {
+                if (Oferta != null && _noPoder < Oferta.Count && pressed == Oferta[_noPoder])
+                {
+                    _noPoder++;
+                    RaisePowerUpHit(_noPoder);
+                    if (_noPoder >= Oferta.Count) { _noPoder = -1; RaisePowerUpGot(); }
+                }
+                else
+                {
+                    _noPoder = -1;
+                    RaisePowerUpLost();
+                    _lockoutUntil = Time.time + (_config != null ? _config.errorLockoutSeconds : 0.5f);
+                    RaiseMiss();
+                }
+                return;
+            }
+
+            // A primeira tecla decide: a da bomba comeca a bomba, a do poder comeca o poder. Elas nunca sao iguais.
+            if (Progress == 0 && Oferta != null && Oferta.Count > 0 && pressed == Oferta[0] && pressed != Sequence[0])
+            {
+                _noPoder = 1;
+                RaisePowerUpHit(1);
+                return;
+            }
+
             if (pressed == Sequence[Progress])
             {
                 Progress++;

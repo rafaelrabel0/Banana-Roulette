@@ -22,6 +22,43 @@ namespace BananaRoulette
         /// <summary>Terminou a sequencia e escolheu o lado. Parametro: Left ou Right.</summary>
         public event Action<ArrowDirection> OnPassChosen;
 
+        /// <summary>Acertou uma tecla da sequencia do poder. Parametro: quantas ja foram.</summary>
+        public event Action<int> OnPowerUpHit;
+        /// <summary>Completou a sequencia do poder: ele e seu.</summary>
+        public event Action OnPowerUpGot;
+        /// <summary>Errou a sequencia do poder: ele se perdeu.</summary>
+        public event Action OnPowerUpLost;
+
+        /// <summary>Sequencia do poder oferecido neste turno. Nulo = nenhum.</summary>
+        protected List<ArrowDirection> Oferta { get; private set; }
+
+        /// <summary>Ataque "comandos invertidos": esquerda vale direita, cima vale baixo. Vale ate o fim do turno.</summary>
+        public bool Invertido { get; set; }
+        /// <summary>Ataque "cola": ate este instante nenhuma tecla conta.</summary>
+        public float TravadoAte { get; set; }
+        /// <summary>Quanto os bots ficam mais lentos neste turno (nevoa e invertido atrapalham os bots assim).</summary>
+        public float Lentidao { get; set; }
+        /// <summary>Quantas teclas da sequencia da bomba ja foram acertadas.</summary>
+        public int ProgressoAtual { get { return Progress; } }
+
+        /// <summary>Oferece um poder neste turno. Chamar depois de BeginTurn.</summary>
+        public virtual void Oferecer(List<ArrowDirection> sequenciaDoPoder) { Oferta = sequenciaDoPoder; }
+
+        /// <summary>Troca a sequencia no meio do turno (meia sequencia, sequencia dobrada).</summary>
+        public void TrocarSequencia(List<ArrowDirection> nova)
+        {
+            if (!IsActive || nova == null) return;
+            Sequence = nova;
+            if (Progress > nova.Count) Progress = nova.Count;
+            AoTrocarSequencia();
+        }
+
+        protected virtual void AoTrocarSequencia() { }
+
+        protected void RaisePowerUpHit(int progress) { if (OnPowerUpHit != null) OnPowerUpHit(progress); }
+        protected void RaisePowerUpGot() { Oferta = null; if (OnPowerUpGot != null) OnPowerUpGot(); }
+        protected void RaisePowerUpLost() { Oferta = null; if (OnPowerUpLost != null) OnPowerUpLost(); }
+
         protected List<ArrowDirection> Sequence { get; private set; }
         protected int Progress { get; set; }
         protected bool IsActive { get; private set; }
@@ -35,6 +72,7 @@ namespace BananaRoulette
             Progress = 0;
             LastPasserIndex = lastPasserIndex;
             IsActive = true;
+            Oferta = null; Invertido = false; TravadoAte = 0f; Lentidao = 1f;
         }
 
         public virtual void EndTurn()
@@ -42,6 +80,7 @@ namespace BananaRoulette
             IsActive = false;
             Sequence = null;
             Progress = 0;
+            Oferta = null;
         }
 
         protected void RaiseHit()
@@ -66,6 +105,9 @@ namespace BananaRoulette
             OnArrowHit = null;
             OnArrowMissed = null;
             OnPassChosen = null;
+            OnPowerUpHit = null;
+            OnPowerUpGot = null;
+            OnPowerUpLost = null;
         }
     }
 }

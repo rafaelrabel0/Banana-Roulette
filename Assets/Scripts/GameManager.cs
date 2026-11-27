@@ -42,6 +42,102 @@ namespace BananaRoulette
         /// <summary>O macaco la atras, que joga a bomba nova para a roda depois de cada explosao. Nulo = a bomba so aparece.</summary>
         public MacacoVisual Lancador;
 
+        // --- poderes ---
+        private PowerUp _oferta = PowerUp.Nenhum;      // o poder oferecido no turno atual
+        private TurnSolver _solverAtual;
+        private List<ArrowDirection> _seqAtual;
+        private bool _memoriaAtual;
+
+        private static string T(string pt, string en) { return Loc.Current == Language.Portuguese ? pt : en; }
+        private string QuemE(MonkeySlot s) { return s.IsHuman ? T("VOCÊ", "YOU") : T("MACACO ", "MONKEY ") + (s.Index + 1); }
+
+        private void MostraInventario()
+        {
+            PowerUp p = _slots[0].Guardado;
+            _hud.SetInventory(p == PowerUp.Nenhum ? "" : T("ESPAÇO: ", "SPACE: ") + PowerUps.Nome(p).ToUpperInvariant() + "  ·  " + PowerUps.Dica(p));
+        }
+
+        /// <summary>
+        /// Usa o poder guardado de um macaco. Devolve falso se nao da para usar agora
+        /// (ataque com a bomba na propria mao, ou poder de portador sem a bomba).
+        /// </summary>
+        public bool UsarPowerUp(MonkeySlot quem)
+        {
+            PowerUp p = quem.Guardado;
+            if (p == PowerUp.Nenhum || !quem.IsAlive || !_running) return false;
+            bool rodadaCorrendo = Current == State.Holding || Current == State.Passing;
+            bool comABomba = rodadaCorrendo && _slots[_holderIndex] == quem;
+            MonkeySlot alvo = _slots[_holderIndex];
+
+            if (PowerUps.EhAtaque(p) && (comABomba || Current != State.Holding || _solverAtual == null)) return false;
+            if (PowerUps.PrecisaDaBomba(p) && (!comABomba || Current != State.Holding || _solverAtual == null)) return false;
+            if (p == PowerUp.PavioMolhado && !rodadaCorrendo) return false;
+
+            switch (p)
+            {
+                case PowerUp.VidaExtra:
+                    quem.GanhaVida();
+                    if (quem.IsHuman) _hud.SetLives(quem.Lives);
+                    break;
+                case PowerUp.PavioMolhado:
+                    _fuse.Molhar(3f);
+                    break;
+                case PowerUp.MeiaSequencia:
+                {
+                    var nova = _seqAtual.GetRange(0, Mathf.Max(1, Mathf.CeilToInt(_seqAtual.Count * 0.5f)));
+                    TrocaSequencia(quem, nova);
+                    break;
+                }
+                case PowerUp.PasseRelampago:
+                    _chosenSide = ArrowDirection.Right;
+                    _turnResolved = true;
+                    break;
+                case PowerUp.Invertido:
+                    _solverAtual.Invertido = true;
+                    _solverAtual.Lentidao = 1.6f;
+                    break;
+                case PowerUp.Dobrada:
+                {
+                    var nova = new List<ArrowDirection>(_seqAtual);
+                    nova.AddRange(SequenceGenerator.Generate(Mathf.Min(_seqAtual.Count, 5)));
+                    TrocaSequencia(alvo, nova);
+                    break;
+                }
+                case PowerUp.PavioCurto:
+                    _fuse.Burn(_fuse.Total * 0.15f);
+                    _banana.FlashBurn();
+                    if (_hud.TopFuse != null) _hud.TopFuse.FlashBurn();
+                    break;
+                case PowerUp.Nevoa:
+                    _memoriaAtual = true;
+                    _solverAtual.Lentidao = 1.6f;
+                    if (alvo.IsHuman) _hud.ShowSequence(_seqAtual, true);
+                    break;
+                case PowerUp.Cola:
+                    _solverAtual.TravadoAte = Time.time + 2f;
+                    break;
+            }
+
+            quem.Guardado = PowerUp.Nenhum;
+            MostraInventario();
+            bool ataque = PowerUps.EhAtaque(p);
+            _hud.SetStatus(QuemE(quem) + ": " + PowerUps.Nome(p).ToUpperInvariant() + (ataque ? T(" EM ", " ON ") + QuemE(alvo) : "") + "!",
+                ataque ? Palette.DynamiteRed : new Color(0.45f, 0.92f, 1f));
+            if (ataque) { SomRetro.Tom(520f, 0.09f, "sawtooth", 0.1f, 260f); SomRetro.Tom(390f, 0.14f, "sawtooth", 0.1f, 190f, 0.1f); }
+            else { SomRetro.Tom(660f, 0.08f, "square", 0.08f); SomRetro.Tom(880f, 0.08f, "square", 0.08f, 0f, 0.09f); SomRetro.Tom(1320f, 0.14f, "square", 0.08f, 0f, 0.18f); }
+            Trace(QuemE(quem) + " usou " + p + (ataque ? " em " + QuemE(alvo) : ""));
+            return true;
+        }
+
+        private void TrocaSequencia(MonkeySlot dono, List<ArrowDirection> nova)
+        {
+            _seqAtual = nova;
+            _solverAtual.TrocarSequencia(nova);
+            if (!dono.IsHuman) return;
+            _hud.ShowSequence(nova, _memoriaAtual);
+            if (!_memoriaAtual) _hud.HighlightFrom(_solverAtual.ProgressoAtual);
+        }
+
         /// <summary>Verdadeiro enquanto a bomba esta na mao do jogador humano e a rodada corre.</summary>
         public bool BombaComJogador
         {
@@ -129,8 +225,21 @@ namespace BananaRoulette
                 if (_hud.TopFuse != null) _hud.TopFuse.SetProgress(burned);
             }
 
+            // bots com poder guardado tentam usar de vez em quando (so sai quando a situacao permite)
+            if (_slots != null)
+            {
+                for (int i = 1; i < _slots.Count; i++)
+                    if (_slots[i].Guardado != PowerUp.Nenhum && Random.value < Time.deltaTime * 0.35f) UsarPowerUp(_slots[i]);
+            }
+
             var keyboard = Keyboard.current;
             if (keyboard == null) return;
+
+            // Espaco: usa o poder guardado
+            if (keyboard.spaceKey.wasPressedThisFrame && !PausaNoCaixote.Aberta && _slots != null && _slots[0].Guardado != PowerUp.Nenhum)
+            {
+                if (!UsarPowerUp(_slots[0])) SomRetro.Tom(150f, 0.12f, "sawtooth", 0.08f); // agora nao da
+            }
 
             // Esc abre o menu da partida (PausaNoCaixote). Sem ele (greybox), Esc sai direto como antes.
             if (keyboard.escapeKey.wasPressedThisFrame && !TemMenuDaPartida)
@@ -159,6 +268,8 @@ namespace BananaRoulette
             _holderIndex = 0;
             _banana.SnapTo(_slots[_holderIndex]);
             _hud.SetAliveCount(AliveCount, _config.monkeyCount);
+            _hud.SetLives(_slots[0].Lives);
+            MostraInventario();
             _hud.SetStatus(Loc.Get("game.lit"), Palette.DynamiteRed);
             _hud.SetEscHint(Loc.Get("game.esc"));
             Trace("Partida iniciada com " + AliveCount + " macacos. Primeiro portador: " + _holderIndex);
@@ -234,8 +345,41 @@ namespace BananaRoulette
             };
             solver.OnArrowMissed += () => HandleMiss(holder);
             solver.OnPassChosen += side => { _chosenSide = side; _turnResolved = true; };
+            solver.OnPowerUpHit += p =>
+            {
+                if (holder.IsHuman) _hud.PowerUpHit(p);
+                holder.Acertou();
+                SomRetro.Tom(990f + 110f * Mathf.Min(p, 4), 0.05f, "sine", 0.07f);
+            };
+            solver.OnPowerUpGot += () =>
+            {
+                holder.Guardado = _oferta;
+                Trace(QuemE(holder) + " pegou o poder " + _oferta);
+                _oferta = PowerUp.Nenhum;
+                if (holder.IsHuman) { _hud.HidePowerUp(); MostraInventario(); }
+                SomRetro.Tom(784f, 0.08f, "square", 0.08f); SomRetro.Tom(1175f, 0.16f, "square", 0.08f, 0f, 0.09f);
+            };
+            solver.OnPowerUpLost += () =>
+            {
+                _oferta = PowerUp.Nenhum;
+                if (holder.IsHuman) _hud.HidePowerUp();
+            };
 
             solver.BeginTurn(sequence, _lastPasserIndex);
+            _solverAtual = solver; _seqAtual = sequence; _memoriaAtual = memoryRound;
+
+            // Poder: so aparece para quem esta com a bomba e nao esta guardando outro. A primeira tecla dele
+            // nunca e igual a primeira da bomba, para a primeira tecla apertada dizer qual dos dois ele escolheu.
+            _oferta = PowerUp.Nenhum;
+            _hud.HidePowerUp();
+            if (holder.Guardado == PowerUp.Nenhum && Random.value < 0.45f)
+            {
+                _oferta = PowerUps.Sortear();
+                var seqPoder = SequenceGenerator.Generate(3);
+                if (seqPoder[0] == sequence[0]) seqPoder[0] = (ArrowDirection)(((int)seqPoder[0] + 1) % 4);
+                solver.Oferecer(seqPoder);
+                if (holder.IsHuman && !memoryRound) _hud.ShowPowerUp(PowerUps.Nome(_oferta), seqPoder);
+            }
 
             bool hintShown = false;
             while (!_turnResolved && !_fuseEnded)
@@ -255,6 +399,8 @@ namespace BananaRoulette
             solver.EndTurn();
             solver.ClearListeners();
             _hud.ShowSideChoice(false);
+            _hud.HidePowerUp();
+            _solverAtual = null; _oferta = PowerUp.Nenhum;
 
             if (_fuseEnded) yield break;
 
@@ -354,13 +500,19 @@ namespace BananaRoulette
             // As duas bananas estouram no mesmo instante: a da mao e a do topo.
             if (_hud.TopFuse != null) StartCoroutine(_hud.TopFuse.Explode());
 
-            victim.Explode();
+            // Duas vidas: a explosao tira uma. Com vida sobrando ele se levanta e continua; sem vida, sai voando.
+            bool fora = victim.PerdeVida();
+            if (fora) victim.Explode(); else victim.Chamuscar();
+            if (victim.IsHuman) _hud.SetLives(victim.Lives);
             Trace(string.Format("EXPLODIU o macaco {0}{1}. Restam {2}.",
                 _holderIndex, victim.IsHuman ? " (VOCE)" : "", AliveCount));
 
-            _hud.SetStatus(victim.IsHuman
-                ? Loc.Get("game.youexploded")
-                : Loc.Format("game.exploded", _holderIndex + 1), Palette.DynamiteRed);
+            if (fora)
+                _hud.SetStatus(victim.IsHuman
+                    ? Loc.Get("game.youexploded")
+                    : Loc.Format("game.exploded", _holderIndex + 1), Palette.DynamiteRed);
+            else
+                _hud.SetStatus(QuemE(victim) + T(" PERDEU UMA VIDA", " LOST A LIFE"), Palette.DynamiteRed);
             _hud.SetAliveCount(AliveCount, _config.monkeyCount);
 
             yield return new WaitForSeconds(_config.explosionPauseSeconds);

@@ -210,9 +210,17 @@ e acrescentar o nome na lista de `Aparencia.cs`.
   e ganha tímpano, caixa e cordas tremidas conforme `MusicaRetro.Perigo` sobe. **É rascunho:** não é
   orquestra gravada. Para trocar por música de verdade, basta substituir essa classe.
 
+### Duas vidas e power-ups
+
+Cada macaco tem 2 vidas. O poder aparece só para quem está com a bomba, com uma sequência de 3 teclas cuja
+primeira é diferente da primeira da bomba: a primeira tecla apertada decide qual das duas está sendo feita.
+Guarda-se um por vez e **Espaço** usa. Há quatro de ajuda (vida extra, pavio molhado, meia sequência, passe
+relâmpago) e cinco de ataque em quem está com a bomba (comandos invertidos, sequência dobrada, pavio curto,
+névoa, cola). Lista e regras em `Assets/Scripts/Jogo3D/PowerUps.cs`; efeitos em `GameManager.UsarPowerUp`.
+
 ### O que ainda não veio
 
-- Emojis/emotes, power-ups.
+- Emojis/emotes; modelos 3D dos power-ups.
 - Música gravada, fumaça na explosão.
 
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.
