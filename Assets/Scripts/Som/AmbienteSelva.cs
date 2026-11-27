@@ -12,6 +12,9 @@ namespace BananaRoulette
     {
         float passaro, folha;
 
+        /// <summary>O menu cala a floresta: ali so toca a musica. Passarinho e folha so durante a historia e a partida.</summary>
+        public static bool Mudo;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Iniciar()
         {
@@ -32,6 +35,7 @@ namespace BananaRoulette
 
         void Update()
         {
+            if (Mudo) return;
             float dt = Time.unscaledDeltaTime;
 
             // passarinho: dois ou tres pios curtos, subindo
@@ -42,7 +46,7 @@ namespace BananaRoulette
                 float[] tons = { 2100f, 2500f, 2900f, 3300f };
                 float f = tons[Random.Range(0, tons.Length)];
                 int n = Random.Range(2, 4);
-                for (int i = 0; i < n; i++) SomRetro.Tom(f, 0.07f, "sine", 0.045f, f * 1.25f, i * 0.11f);
+                for (int i = 0; i < n; i++) SomRetro.Tom(f, 0.12f, "sine", 0.03f, f * 0.82f, i * 0.2f); // pio que desce, devagar: nao parece risada de macaco
             }
 
             // folhas mexendo com o vento
@@ -50,7 +54,7 @@ namespace BananaRoulette
             if (folha <= 0f)
             {
                 folha = Random.Range(5f, 11f);
-                SomRetro.Ruido(Random.value < 0.5f ? 1.2f : 1.8f, 0.03f, 3500f, "highpass");
+                SomRetro.Ruido(Random.value < 0.5f ? 1.2f : 1.8f, 0.022f, 700f, "bandpass"); // grave e abafado: chiado agudo parecia pavio
             }
         }
     }

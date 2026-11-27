@@ -225,6 +225,16 @@ quem está com a bomba. Tecla **E** faz o seu macaco fazer a gracinha escolhida 
 mandam emoji. Código em `Assets/Scripts/Jogo3D/Recados.cs`; as carinhas ficam em `Assets/Resources/Jogo/emojis.png`
 e são desenhadas na prévia por `__cena.exportaEmojis()`.
 
+### Polimento 1 (27/11/2026)
+
+- **Teste "primeira vez / já jogou":** tecla **F3** no menu principal, ou OPÇÕES > JOGABILIDADE > Teste. Primeira vez mostra
+  a pergunta do tutorial e a história inteira; já jogou vai direto: a câmera se afasta e o macaco do fundo joga a bomba.
+- **Vidas** são bananas no chão ao lado de cada macaco; quem perde uma pisa nela e sobra a casca.
+- **Poderes** aparecem de vez em quando (intervalo de 10 a 18 s). O desenho de cada um está em
+  `Assets/Resources/Jogo/poderes.png` (prévia: `__cena.exportaPoderes()`); o poder guardado aparece acima da cabeça.
+- **Animação:** trocas misturadas (`MacacoVisual.Mistura`), arremesso em quatro tempos, clipes novos `jogaCima` e `pisa`.
+- **Cosméticos:** boné moldado na cabeça, orelha dobrada com fone e cartola, óculos sem haste, brincos com volume.
+
 ### O que ainda não veio
 
 - Modelos 3D dos power-ups; gracinhas com animação própria; música gravada.

@@ -19,7 +19,7 @@ namespace BananaRoulette
     public class MacacoVisual : MonoBehaviour
     {
         [Serializable] class ClipeJ { public string nome; public float ini, fim; public int repete; }
-        [Serializable] class DadosJ { public float fps = 24f, duracao = 9f, raio = 15f; public ClipeJ[] clipes; public float[] roda; }
+        [Serializable] class DadosJ { public float fps = 24f, duracao = 9f, raio = 15f; public ClipeJ[] clipes; public float[] roda; public float[] pisa; }
 
         static GameObject modelo;
         static AnimationClip clipe;
@@ -34,8 +34,25 @@ namespace BananaRoulette
 
         public static Vector3 CentroDaRoda { get { Carrega(); return dados != null && dados.roda != null ? new Vector3(-dados.roda[0], dados.roda[1], dados.roda[2]) : Vector3.zero; } }
 
+        /// <summary>Onde o pe bate na animacao "pisa", na medida da previa (x para o lado, z para a frente).</summary>
+        public static Vector2 Pisa { get { Carrega(); return dados != null && dados.pisa != null && dados.pisa.Length >= 2 ? new Vector2(dados.pisa[0], dados.pisa[1]) : new Vector2(3.3f, 3.7f); } }
+
         Animation anim;
         AnimationState estado;
+        // Troca suave: a pose em que o macaco estava fica congelada num segundo estado e se desfaz em fracoes de
+        // segundo por cima da animacao nova. Sem isso cada troca de animacao era um corte seco (o "travado").
+        AnimationState estadoDe;
+        float tAmostra, tDe, mistura, durMistura = 0.14f;
+
+        // Orelhas: com fone ou cartola elas dobram para tras, por baixo do acessorio.
+        readonly List<Transform> orelhas = new List<Transform>();
+        Quaternion[] orelhaRepouso; Vector3[] orelhaEixo;
+        float dobra;
+
+        // Suor: gotas que saltam da cabeca. 0 = nenhuma, 1 = muitas.
+        public float Suor;
+        Transform cabeca;
+        Transform[] gotas; float[] idadeGota; Vector3[] velGota; float proxGota;
         readonly Dictionary<string, ClipeJ> porNome = new Dictionary<string, ClipeJ>();
         ClipeJ laco, umaVez;
         float tLaco, tUmaVez;
@@ -67,6 +84,7 @@ namespace BananaRoulette
                             (brinco != "" && t.name.StartsWith("Ac_brinco_" + brinco));
                 if (t.gameObject.activeSelf != liga) t.gameObject.SetActive(liga);
             }
+            dobra = chapeu == "fone" ? 1.15f : chapeu == "cartola" ? 0.5f : 0f;
         }
 
         static void Carrega()
@@ -127,13 +145,18 @@ namespace BananaRoulette
             {
                 if (anim.GetClip(clipe.name) == null) anim.AddClip(clipe, clipe.name);
                 estado = anim[clipe.name];
+                if (anim.GetClip("de") == null) anim.AddClip(clipe, "de");
+                estadoDe = anim["de"];
             }
 
             foreach (Transform t in GetComponentsInChildren<Transform>(true))
             {
                 if (t.name.StartsWith("PontoMaco")) PontoMaco = t;
                 else if (t.name.StartsWith("Ac_")) acessorios.Add(t);
+                else if (t.name.StartsWith("Orelha")) orelhas.Add(t);
+                else if (t.name.StartsWith("Cabeca")) cabeca = t;
             }
+            MedeOrelhas();
             Vestir("", "", ""); // nasce sem nada na cabeca
 
             // Cada macaco ganha copias dos materiais, para ter a propria cor de pelo e poder tostar sozinho.
@@ -162,6 +185,75 @@ namespace BananaRoulette
             Amostrar();
         }
 
+        void Pose(float t) { estado.enabled = true; estado.weight = 1f; estado.time = t; anim.Sample(); estado.enabled = false; }
+
+        // Descobre para que lado a orelha gira comparando duas poses do proprio modelo (parado = reta, olhando =
+        // um pouco para tras). Assim a dobra nao depende de como o importador converte os eixos.
+        void MedeOrelhas()
+        {
+            ClipeJ p, o;
+            if (estado == null || orelhas.Count == 0 || !porNome.TryGetValue("parado", out p) || !porNome.TryGetValue("olhando", out o)) { orelhas.Clear(); return; }
+            orelhaRepouso = new Quaternion[orelhas.Count]; orelhaEixo = new Vector3[orelhas.Count];
+            Pose(p.ini + 0.05f);
+            for (int i = 0; i < orelhas.Count; i++) orelhaRepouso[i] = orelhas[i].localRotation;
+            Pose(o.ini + 0.05f);
+            for (int i = 0; i < orelhas.Count; i++)
+            {
+                float ang; Vector3 eixo;
+                (orelhas[i].localRotation * Quaternion.Inverse(orelhaRepouso[i])).ToAngleAxis(out ang, out eixo);
+                if (ang > 180f) { ang = 360f - ang; eixo = -eixo; }
+                orelhaEixo[i] = ang > 1f ? eixo : Vector3.zero;
+            }
+        }
+
+        void Mistura(float dur) { tDe = tAmostra; mistura = 1f; durMistura = Mathf.Max(0.01f, dur); }
+
+        void PassoDoSuor(float dt)
+        {
+            if (cabeca == null) return;
+            if (gotas == null)
+            {
+                if (Suor <= 0.02f) return;
+                gotas = new Transform[6]; idadeGota = new float[6]; velGota = new Vector3[6];
+                var agua = new Material(Shader.Find("BananaRoulette/Retro"));
+                agua.SetColor("_BaseColor", new Color(0.8f, 0.92f, 0.97f)); agua.SetFloat("_SemLuz", 1f);
+                for (int i = 0; i < gotas.Length; i++)
+                {
+                    var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    go.name = "Gota de suor";
+                    Destroy(go.GetComponent<Collider>());
+                    go.transform.SetParent(transform, false);
+                    var r = go.GetComponent<Renderer>(); r.sharedMaterial = agua; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    go.SetActive(false);
+                    gotas[i] = go.transform; idadeGota[i] = -1f;
+                }
+            }
+            proxGota -= dt;
+            if (Suor > 0.02f && proxGota <= 0f)
+            {
+                proxGota = Mathf.Lerp(0.7f, 0.08f, Mathf.Clamp01(Suor));
+                for (int i = 0; i < gotas.Length; i++)
+                {
+                    if (idadeGota[i] >= 0f) continue;
+                    float lado = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+                    Vector3 c = transform.InverseTransformPoint(cabeca.position);
+                    gotas[i].localPosition = c + new Vector3(lado * UnityEngine.Random.Range(1.2f, 2.2f), UnityEngine.Random.Range(3.2f, 4.6f), 0.9f);
+                    velGota[i] = new Vector3(lado * UnityEngine.Random.Range(2.5f, 5f), UnityEngine.Random.Range(3f, 6f), UnityEngine.Random.Range(0f, 1.5f));
+                    idadeGota[i] = 0f; gotas[i].gameObject.SetActive(true);
+                    break;
+                }
+            }
+            for (int i = 0; i < gotas.Length; i++)
+            {
+                if (idadeGota[i] < 0f) continue;
+                idadeGota[i] += dt; velGota[i].y -= 26f * dt;
+                gotas[i].localPosition += velGota[i] * dt;
+                float k = idadeGota[i] / 0.55f;
+                gotas[i].localScale = new Vector3(0.3f, 0.46f, 0.3f) * (1f - 0.5f * Mathf.Clamp01(k));
+                if (k >= 1f) { idadeGota[i] = -1f; gotas[i].gameObject.SetActive(false); }
+            }
+        }
+
         /// <summary>Troca a cor do pelo deste macaco.</summary>
         public void DefinirPelo(Color cor)
         {
@@ -176,6 +268,7 @@ namespace BananaRoulette
             ClipeJ c;
             if (!porNome.TryGetValue(nome, out c) || c == laco) return;
             laco = c; tLaco = 0f;
+            if (umaVez == null) Mistura(0.18f);
         }
 
         /// <summary>Toca uma animacao de uma vez so. ficaNoFim = para no ultimo quadro (explosao).</summary>
@@ -184,6 +277,7 @@ namespace BananaRoulette
             ClipeJ c;
             if (!porNome.TryGetValue(nome, out c)) return;
             umaVez = c; tUmaVez = 0f; seguraNoFim = ficaNoFim; voltasUmaVez = Mathf.Max(1, voltas);
+            Mistura(nome == "explode" ? 0.05f : 0.1f);
         }
 
         /// <summary>Pulinho curto por cima da animacao: usado a cada seta acertada.</summary>
@@ -216,7 +310,7 @@ namespace BananaRoulette
                 if (tUmaVez >= (umaVez.fim - umaVez.ini) * voltasUmaVez)
                 {
                     if (seguraNoFim) tUmaVez = umaVez.fim - umaVez.ini;
-                    else { umaVez = null; tLaco = 0f; }
+                    else { umaVez = null; tLaco = 0f; Mistura(0.2f); }
                 }
             }
             if (umaVez == null && laco != null)
@@ -225,6 +319,8 @@ namespace BananaRoulette
                 float dur = laco.fim - laco.ini;
                 if (tLaco >= dur) tLaco %= dur;
             }
+            if (mistura > 0f) mistura = Mathf.Max(0f, mistura - dt / durMistura);
+            PassoDoSuor(dt);
             if (pisca > 0f) { pisca = Mathf.Max(0f, pisca - dt * 5f); PintaTudo(); }
             pulo = Mathf.Max(0f, pulo - dt * 7f);
             transform.localPosition = posBase + Vector3.up * (Mathf.Sin(pulo * Mathf.PI) * 0.22f);
@@ -240,9 +336,17 @@ namespace BananaRoulette
             if (umaVez != null && voltasUmaVez > 1) local %= (umaVez.fim - umaVez.ini);
             // um fio antes do fim do trecho, para nao cair no primeiro quadro da animacao seguinte
             float t = Mathf.Min(c.ini + local, c.fim - 0.5f / dados.fps);
-            estado.enabled = true; estado.weight = 1f; estado.time = t;
+            float m = mistura > 0f && estadoDe != null ? mistura * mistura * (3f - 2f * mistura) : 0f;
+            estado.enabled = true; estado.weight = 1f - m; estado.time = t;
+            if (m > 0f) { estadoDe.enabled = true; estadoDe.weight = m; estadoDe.time = tDe; }
             anim.Sample();
             estado.enabled = false;
+            if (estadoDe != null) estadoDe.enabled = false;
+            tAmostra = t;
+
+            if (dobra > 0f && orelhaEixo != null)
+                for (int i = 0; i < orelhas.Count; i++)
+                    if (orelhaEixo[i] != Vector3.zero) orelhas[i].localRotation = Quaternion.AngleAxis(dobra * Mathf.Rad2Deg, orelhaEixo[i]) * orelhaRepouso[i];
         }
     }
 }

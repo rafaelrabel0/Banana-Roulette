@@ -166,6 +166,9 @@ namespace BananaRoulette
                     Add(() => T("Teclas", "Keys"), () => GameSettings.UseLetters ? T("LETRAS (W A S D)", "LETTERS (W A S D)") : T("SETAS", "ARROWS"),
                         dir => GameSettings.SetUseLetters(!GameSettings.UseLetters));
                     Aviso(() => T("Vale para digitar a sequência e escolher o lado.", "Used to type the sequence and pick a side."));
+                    // TESTE: escolhe como o jogo trata quem aperta JOGAR. Primeira vez = pergunta do tutorial e a historia inteira.
+                    Add(() => T("Teste", "Test"), () => GameSettings.Played ? T("JÁ JOGOU (SEM HISTÓRIA)", "PLAYED (NO STORY)") : T("PRIMEIRA VEZ (HISTÓRIA)", "FIRST TIME (STORY)"),
+                        dir => GameSettings.SetPlayed(!GameSettings.Played));
                     break;
                 default: // controles
                     titulo = () => Loc.Get("set.controls");

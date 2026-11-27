@@ -47,6 +47,14 @@ namespace BananaRoulette
         /// <summary>O macaco la atras, que joga a bomba nova para a roda depois de cada explosao. Nulo = a bomba so aparece.</summary>
         public MacacoVisual Lancador;
 
+        /// <summary>
+        /// Entrada curta (quem ja jogou): em vez da historia, o macaco la do fundo joga a primeira bomba para a roda.
+        /// O menu liga antes de pedir a partida; a partida desliga ao usar.
+        /// </summary>
+        public static bool EntradaCurta;
+
+        private float _proximaOferta; // um poder so volta a aparecer depois de um intervalo
+
         // --- poderes ---
         private PowerUp _oferta = PowerUp.Nenhum;      // o poder oferecido no turno atual
         private TurnSolver _solverAtual;
@@ -271,7 +279,11 @@ namespace BananaRoulette
             // A banana comeca na mao do jogador, nao sorteada: apertar JOGAR
             // tem que virar acao na hora, sem esperar a roda dar meia volta.
             _holderIndex = 0;
-            _banana.SnapTo(_slots[_holderIndex]);
+            bool curta = EntradaCurta && Lancador != null && Lancador.PontoMaco != null;
+            EntradaCurta = false;
+            _proximaOferta = Time.time + 8f;
+            if (curta) { _banana.UpdateFuseVisual(0f); _banana.SeguirPonto(Lancador.PontoMaco); Lancador.Laco("segura1"); }
+            else _banana.SnapTo(_slots[_holderIndex]);
             _hud.SetAliveCount(AliveCount, _config.monkeyCount);
             _hud.SetLives(_slots[0].Lives);
             MostraInventario();
@@ -279,7 +291,23 @@ namespace BananaRoulette
             _hud.SetEscHint(Loc.Get("game.esc"));
             Trace("Partida iniciada com " + AliveCount + " macacos. Primeiro portador: " + _holderIndex);
 
-            yield return new WaitForSeconds(1.2f);
+            if (curta)
+            {
+                // a camera chega, o macaco do fundo faz um malabarismo e joga a bomba para o jogador
+                yield return new WaitForSeconds(1.7f);
+                Lancador.Laco("olhando");
+                Lancador.Tocar(Lancador.transform.InverseTransformPoint(_slots[_holderIndex].transform.position).x < 0f ? "jogaE" : "jogaD");
+                _slots[_holderIndex].Receber();
+                SomRetro.Grito(820f, 520f, 0.25f, 0.4f);
+                SomRetro.Ruido(0.5f, 0.16f, 800f, "bandpass", 0.15f);
+                yield return new WaitForSeconds(0.16f); // a bomba sai da mao no meio do gesto
+                _banana.SeguirPonto(null);
+                yield return _banana.FlyTo(_slots[_holderIndex], 1.05f, 7f);
+                SomRetro.Grito(600f, 950f, 0.14f, 0.45f);
+                _banana.SnapTo(_slots[_holderIndex]);
+                yield return new WaitForSeconds(0.3f);
+            }
+            else yield return new WaitForSeconds(1.2f);
 
             while (AliveCount > 1)
             {
@@ -377,8 +405,10 @@ namespace BananaRoulette
             // nunca e igual a primeira da bomba, para a primeira tecla apertada dizer qual dos dois ele escolheu.
             _oferta = PowerUp.Nenhum;
             _hud.HidePowerUp();
-            if (holder.Guardado == PowerUp.Nenhum && Random.value < 0.45f)
+            // De vez em quando, nao a cada turno: depois de aparecer um, o proximo demora.
+            if (holder.Guardado == PowerUp.Nenhum && Time.time >= _proximaOferta && Random.value < 0.4f)
             {
+                _proximaOferta = Time.time + Random.Range(10f, 18f);
                 _oferta = PowerUps.Sortear();
                 var seqPoder = SequenceGenerator.Generate(3);
                 if (seqPoder[0] == sequence[0]) seqPoder[0] = (ArrowDirection)(((int)seqPoder[0] + 1) % 4);
@@ -478,6 +508,8 @@ namespace BananaRoulette
             Trace(string.Format("Macaco {0} passou para {1} ({2}).",
                 _lastPasserIndex, nextIndex, _chosenSide));
 
+            // a bomba fica na mao durante o recolhimento do braco e so entao sai (o gesto do arremesso tem 0,7 s)
+            yield return new WaitForSeconds(0.13f);
             yield return _banana.FlyTo(_slots[nextIndex], _config.passFlightSeconds);
         }
 
@@ -538,11 +570,13 @@ namespace BananaRoulette
                     if (Lancador != null && Lancador.PontoMaco != null)
                     {
                         _banana.UpdateFuseVisual(0f);
-                        _banana.transform.position = Lancador.PontoMaco.position;
+                        _banana.SeguirPonto(Lancador.PontoMaco);
                         Lancador.Tocar(Lancador.transform.InverseTransformPoint(_slots[_holderIndex].transform.position).x < 0f ? "jogaE" : "jogaD");
                         _slots[_holderIndex].Receber();
                         SomRetro.Grito(820f, 520f, 0.25f, 0.4f);              // o grito de quem se livra dela
                         SomRetro.Ruido(0.5f, 0.16f, 800f, "bandpass", 0.1f);  // a bomba no ar
+                        yield return new WaitForSeconds(0.16f);
+                        _banana.SeguirPonto(null);
                         yield return _banana.FlyTo(_slots[_holderIndex], 0.95f, 6.5f);
                         SomRetro.Grito(600f, 950f, 0.14f, 0.45f);
                     }

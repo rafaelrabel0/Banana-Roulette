@@ -17,7 +17,18 @@ namespace BananaRoulette
         /// <summary>O poder que este macaco esta guardando (um por vez).</summary>
         public PowerUp Guardado = PowerUp.Nenhum;
 
-        private readonly Transform[] _bolinhas = new Transform[4]; // 3 de vida + 1 do poder guardado
+        // ---------------------------------------------------------------- vidas: bananas no chao, ao lado do macaco
+        // A banana da vez fica onde o pe dele bate (animacao "pisa"); as outras fazem fila para fora.
+        // Perdeu uma vida: ele pisa nela e sobra a casca. As que restam andam um lugar.
+        private readonly Transform[] _bananas = new Transform[3];
+        private Transform _casca, _selo;
+        private Material _matSelo;
+        private UnityEngine.Mesh _malhaSelo;
+        private PowerUp _seloDe = PowerUp.Nenhum;
+        private Vector3 _lugarDoPe, _passoDaFila;
+        private int _vidasVisiveis = 2;
+        private bool _pisando;
+        private Camera _cam;
 
         public void GanhaVida() { Lives = Mathf.Min(3, Lives + 1); }
 
@@ -28,33 +39,192 @@ namespace BananaRoulette
             return Lives <= 0;
         }
 
-        /// <summary>Explodiu mas ainda tem vida: cai para tras, pisca de preto e se levanta.</summary>
+        /// <summary>Explodiu mas ainda tem vida: cai para tras, pisca de preto, levanta e pisa na banana que perdeu.</summary>
         public void Chamuscar()
         {
             if (_visual == null) return;
             _visual.Tocar("explode");
             _visual.Piscar(new Color(0.08f, 0.07f, 0.06f));
+            StartCoroutine(PisaNaBanana());
         }
 
-        private void MontaBolinhas()
+        private System.Collections.IEnumerator PisaNaBanana()
         {
-            var tinta = Shader.Find("BananaRoulette/Retro");
-            for (int i = 0; i < _bolinhas.Length; i++)
+            _pisando = true;
+            yield return new WaitForSeconds(1.0f);
+            _visual.Tocar("pisa");
+            yield return new WaitForSeconds(0.8f * 0.47f); // o instante em que o pe chega ao chao
+            Esmaga();
+            _pisando = false;
+        }
+
+        // A banana da vez vira casca. Ploft.
+        private void Esmaga()
+        {
+            if (_bananas[0] == null || _vidasVisiveis <= 0) return;
+            Transform b = _bananas[0];
+            b.gameObject.SetActive(false);
+            for (int i = 0; i < _bananas.Length - 1; i++) _bananas[i] = _bananas[i + 1];
+            _bananas[_bananas.Length - 1] = b;
+            _vidasVisiveis--;
+            if (_casca != null)
             {
-                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                go.name = i < 3 ? "Vida " + (i + 1) : "Poder guardado";
-                Destroy(go.GetComponent<Collider>());
-                go.transform.SetParent(transform, false);
-                go.transform.localPosition = i < 3 ? new Vector3(-0.34f + 0.34f * i, 3.55f, 0f) : new Vector3(0f, 4.0f, 0f); // acima de qualquer chapeu
-                go.transform.localScale = Vector3.one * (i < 3 ? 0.26f : 0.32f);
-                var r = go.GetComponent<Renderer>();
-                var m = new Material(tinta);
-                m.SetColor("_BaseColor", i < 3 ? new Color(0.92f, 0.22f, 0.2f) : new Color(0.25f, 0.85f, 0.95f));
-                m.SetFloat("_SemLuz", 1f);
-                r.sharedMaterial = m;
-                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                _bolinhas[i] = go.transform;
+                _casca.localPosition = _lugarDoPe;
+                _casca.localRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+                _casca.localScale = Vector3.one * 1.5f; // nasce esparramada e assenta
+                _casca.gameObject.SetActive(true);
             }
+            SomRetro.Ruido(0.12f, 0.35f, 500f, "lowpass");
+            SomRetro.Tom(190f, 0.14f, "sine", 0.22f, 70f);
+        }
+
+        private static UnityEngine.Mesh _malhaBanana;
+
+        // Banana de poucos lados, em arco, deitada no chao. Feita por codigo ate o modelo 3D definitivo chegar.
+        private static UnityEngine.Mesh MalhaBanana()
+        {
+            if (_malhaBanana != null) return _malhaBanana;
+            const int aneis = 8, lados = 5;
+            var vs = new System.Collections.Generic.List<Vector3>();
+            var ts = new System.Collections.Generic.List<int>();
+            for (int a = 0; a < aneis; a++)
+            {
+                float u = a / (float)(aneis - 1), ang = Mathf.Lerp(-1.0f, 1.0f, u);
+                Vector3 centro = new Vector3(Mathf.Sin(ang) * 0.55f, 0.17f, (1f - Mathf.Cos(ang)) * 0.55f);
+                Vector3 tang = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)), lado = new Vector3(-tang.z, 0f, tang.x);
+                float r = 0.035f + 0.125f * Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Lerp(0.08f, 0.94f, u)), 0.6f);
+                for (int l = 0; l < lados; l++)
+                {
+                    float t = l / (float)lados * Mathf.PI * 2f;
+                    vs.Add(centro + (lado * Mathf.Cos(t) + Vector3.up * Mathf.Sin(t)) * r);
+                }
+            }
+            for (int a = 0; a < aneis - 1; a++)
+                for (int l = 0; l < lados; l++)
+                {
+                    int i0 = a * lados + l, i1 = a * lados + (l + 1) % lados, i2 = i0 + lados, i3 = i1 + lados;
+                    ts.Add(i0); ts.Add(i2); ts.Add(i1); ts.Add(i1); ts.Add(i2); ts.Add(i3);
+                }
+            _malhaBanana = new UnityEngine.Mesh { name = "Banana de vida" };
+            _malhaBanana.SetVertices(vs); _malhaBanana.SetTriangles(ts, 0);
+            _malhaBanana.RecalculateNormals(); _malhaBanana.RecalculateBounds();
+            return _malhaBanana;
+        }
+
+        private static Material Tinta(Color cor, bool doisLados = false)
+        {
+            var m = new Material(Shader.Find("BananaRoulette/Retro"));
+            m.SetColor("_BaseColor", cor);
+            if (doisLados) m.SetFloat("_Cull", 0f);
+            return m;
+        }
+
+        private static Transform Bloco(Transform pai, Vector3 pos, Vector3 tamanho, float giroY, Material tinta)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Destroy(go.GetComponent<Collider>());
+            go.transform.SetParent(pai, false);
+            go.transform.localPosition = pos; go.transform.localScale = tamanho; go.transform.localRotation = Quaternion.Euler(0f, giroY, 0f);
+            go.GetComponent<Renderer>().sharedMaterial = tinta;
+            return go.transform;
+        }
+
+        private void MontaVidas()
+        {
+            float esc = _visual.transform.localScale.x;
+            Vector2 pe = MacacoVisual.Pisa;
+            // a previa tem o X ao contrario da Unity
+            _lugarDoPe = _visual.transform.localPosition + _visual.transform.localRotation * (new Vector3(-pe.x, 0f, pe.y) * esc);
+            _passoDaFila = new Vector3(-0.6f, 0f, -0.22f) * (esc / 0.25f);
+            float porte = 0.85f * (esc / 0.25f);
+
+            Material amarelo = Tinta(new Color(0.96f, 0.80f, 0.22f), true), ponta = Tinta(new Color(0.30f, 0.20f, 0.10f));
+            Material cascaFora = Tinta(new Color(0.90f, 0.72f, 0.20f)), cascaDentro = Tinta(new Color(0.97f, 0.92f, 0.70f));
+            for (int i = 0; i < _bananas.Length; i++)
+            {
+                var go = new GameObject("Vida " + (i + 1), typeof(MeshFilter), typeof(MeshRenderer));
+                go.transform.SetParent(transform, false);
+                go.GetComponent<MeshFilter>().sharedMesh = MalhaBanana();
+                go.GetComponent<Renderer>().sharedMaterial = amarelo;
+                Bloco(go.transform, new Vector3(-0.47f, 0.17f, 0.25f), Vector3.one * 0.07f, 30f, ponta);
+                Bloco(go.transform, new Vector3(0.49f, 0.2f, 0.28f), new Vector3(0.06f, 0.06f, 0.14f), -35f, ponta);
+                go.transform.localPosition = _lugarDoPe + _passoDaFila * i - new Vector3(0f, 0f, 0.25f) * porte;
+                go.transform.localRotation = Quaternion.Euler(0f, 20f + 25f * i, 0f);
+                go.transform.localScale = Vector3.zero;
+                go.AddComponent<Porte>().alvo = porte;
+                _bananas[i] = go.transform;
+            }
+
+            var casca = new GameObject("Casca de banana");
+            casca.transform.SetParent(transform, false);
+            for (int k = 0; k < 4; k++)
+            {
+                float g = 90f * k + 20f, rad = g * Mathf.Deg2Rad;
+                Bloco(casca.transform, new Vector3(Mathf.Cos(rad) * 0.2f, 0.03f, -Mathf.Sin(rad) * 0.2f) * porte, new Vector3(0.36f, 0.03f, 0.13f) * porte, g, k % 2 == 0 ? cascaFora : cascaDentro);
+            }
+            Bloco(casca.transform, new Vector3(0f, 0.05f, 0f), new Vector3(0.12f, 0.08f, 0.12f) * porte, 45f, ponta);
+            casca.SetActive(false);
+            _casca = casca.transform;
+
+            // selo do poder guardado: o desenho 2D do poder, acima da cabeca, virado para a camera
+            var texPoderes = Resources.Load<Texture2D>("Jogo/poderes");
+            if (texPoderes != null)
+            {
+                texPoderes.filterMode = FilterMode.Point;
+                var selo = new GameObject("Poder guardado", typeof(MeshFilter), typeof(MeshRenderer));
+                selo.transform.SetParent(transform, false);
+                selo.transform.localPosition = new Vector3(0f, 4.1f, 0f);
+                _malhaSelo = new UnityEngine.Mesh();
+                _malhaSelo.vertices = new[] { new Vector3(-0.5f, -0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f), new Vector3(0.5f, -0.5f, 0f) };
+                _malhaSelo.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+                _malhaSelo.uv = new[] { Vector2.zero, Vector2.up, Vector2.one, Vector2.right };
+                selo.GetComponent<MeshFilter>().sharedMesh = _malhaSelo;
+                _matSelo = new Material(Shader.Find("Sprites/Default")) { mainTexture = texPoderes };
+                var rs = selo.GetComponent<Renderer>(); rs.sharedMaterial = _matSelo; rs.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                selo.SetActive(false);
+                _selo = selo.transform;
+            }
+        }
+
+        /// <summary>Faz o objeto crescer ate o tamanho certo quando aparece (a banana nova "brota").</summary>
+        private class Porte : MonoBehaviour
+        {
+            public float alvo = 1f;
+            private void OnEnable() { transform.localScale = Vector3.zero; }
+            private void Update()
+            {
+                float s = Mathf.MoveTowards(transform.localScale.x, alvo, Time.deltaTime * alvo * 6f);
+                transform.localScale = Vector3.one * s;
+            }
+        }
+
+        private void PassoDasVidas()
+        {
+            if (_bananas[0] == null) return;
+            if (!_pisando) _vidasVisiveis = Lives;
+            for (int i = 0; i < _bananas.Length; i++)
+            {
+                bool liga = IsAlive && i < _vidasVisiveis;
+                if (_bananas[i].gameObject.activeSelf != liga) _bananas[i].gameObject.SetActive(liga);
+                if (liga) _bananas[i].localPosition = Vector3.Lerp(_bananas[i].localPosition, _lugarDoPe + _passoDaFila * i, Time.deltaTime * 6f);
+            }
+            if (_casca != null && _casca.gameObject.activeSelf)
+                _casca.localScale = Vector3.Lerp(_casca.localScale, Vector3.one, Time.deltaTime * 10f);
+
+            if (_selo == null) return;
+            bool tem = IsAlive && Guardado != PowerUp.Nenhum;
+            if (_selo.gameObject.activeSelf != tem) _selo.gameObject.SetActive(tem);
+            if (!tem) return;
+            if (_seloDe != Guardado)
+            {
+                _seloDe = Guardado;
+                int n = (int)Guardado - 1, col = n % 4, lin = n / 4;
+                float u0 = col / 4f, u1 = u0 + 0.25f, v1 = 1f - lin / 4f, v0 = v1 - 0.25f;
+                _malhaSelo.uv = new[] { new Vector2(u0, v0), new Vector2(u0, v1), new Vector2(u1, v1), new Vector2(u1, v0) };
+            }
+            if (_cam == null) _cam = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();
+            if (_cam != null) _selo.rotation = _cam.transform.rotation;
+            _selo.localScale = Vector3.one * (0.95f + 0.06f * Mathf.Sin(Time.time * 5f));
         }
 
         private Renderer _renderer;
@@ -73,7 +243,7 @@ namespace BananaRoulette
         {
             _visual = visual;
             if (_visual != null && _renderer != null) _renderer.enabled = false;
-            if (_visual != null) MontaBolinhas();
+            if (_visual != null) MontaVidas();
         }
 
         public MacacoVisual Visual { get { return _visual; } }
@@ -125,19 +295,14 @@ namespace BananaRoulette
 
         private void Update()
         {
-            // bolinhas vermelhas = vidas; a azul em cima = tem poder guardado
-            for (int i = 0; i < _bolinhas.Length; i++)
-            {
-                if (_bolinhas[i] == null) continue;
-                bool liga = IsAlive && (i < 3 ? i < Lives : Guardado != PowerUp.Nenhum);
-                if (_bolinhas[i].gameObject.activeSelf != liga) _bolinhas[i].gameObject.SetActive(liga);
-            }
+            PassoDasVidas();
 
             if (!IsAlive) return;
 
             if (_visual != null)
             {
                 // Quanto mais curto o pavio, mais desesperado quem segura; os outros so se assustam no fim.
+                _visual.Suor = _isHolding ? Tensao : 0f; // quem segura sua cada vez mais
                 if (_isHolding) _visual.Laco(Tensao > 0.7f ? "segura3" : Tensao > 0.38f ? "segura2" : "segura1");
                 else _visual.Laco(Tensao > 0.45f ? "olhando" : "parado");
                 return;
@@ -187,7 +352,18 @@ namespace BananaRoulette
             IsAlive = false;
             _isHolding = false;
             StopAllCoroutines();
-            if (_visual != null) { StartCoroutine(VoaLonge()); return; }
+            _pisando = false;
+            if (_visual != null)
+            {
+                // a ultima banana e esmagada pela explosao; a casca fica no chao, ele vai embora voando
+                _vidasVisiveis = Mathf.Max(1, _vidasVisiveis);
+                Esmaga();
+                _vidasVisiveis = 0;
+                if (_casca != null) _casca.SetParent(null, true);
+                _visual.Suor = 0f;
+                StartCoroutine(VoaLonge());
+                return;
+            }
             StartCoroutine(ExplodeRoutine());
         }
 
@@ -255,7 +431,8 @@ namespace BananaRoulette
         public void Celebrate()
         {
             StopAllCoroutines();
-            if (_visual != null) { _visual.Laco("vence"); return; }
+            _pisando = false;
+            if (_visual != null) { _visual.Suor = 0f; _visual.Laco("vence"); return; }
             StartCoroutine(CelebrateRoutine());
         }
 

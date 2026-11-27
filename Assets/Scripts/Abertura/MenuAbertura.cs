@@ -101,15 +101,7 @@ namespace BananaRoulette
             texTampa[0] = Resources.Load<Texture2D>("Abertura/tampa-estudio");
             texTampa[1] = Resources.Load<Texture2D>("Abertura/tampa-estudio-en");
             // Frente do caixote: quem nunca jogou ve o TUTORIAL logo abaixo do JOGAR; depois ele desce para o lado do PERSONAGEM.
-            string arrumacao = GameSettings.Played ? "normal" : "primeira";
-            var frente = Resources.Load<TextAsset>("Abertura/menu-frente");
-            if (frente != null)
-            {
-                var f = JsonUtility.FromJson<FrenteJ>(frente.text);
-                d.menu = GameSettings.Played ? f.normal : f.primeira;
-            }
-            texFrente[0] = Resources.Load<Texture2D>("Abertura/menu-frente-" + arrumacao + "-pt");
-            texFrente[1] = Resources.Load<Texture2D>("Abertura/menu-frente-" + arrumacao + "-en");
+            CarregaFrente();
             texOpcoes[1] = Resources.Load<Texture2D>("Abertura/menu-opcoes-en");
             texLateral[1] = Resources.Load<Texture2D>("Abertura/menu-lateral-en");
             texCreditos[0] = Resources.Load<Texture2D>("Abertura/creditos-chao");
@@ -197,6 +189,21 @@ namespace BananaRoulette
         {
             if (m.HasProperty("_BaseMap")) return m.GetTexture("_BaseMap");
             return m.HasProperty("baseColorTexture") ? m.GetTexture("baseColorTexture") : null;
+        }
+
+        // Frente do caixote nas duas arrumacoes: "primeira" (nunca jogou) e "normal". Chamado de novo quando o teste troca.
+        void CarregaFrente()
+        {
+            string arrumacao = GameSettings.Played ? "normal" : "primeira";
+            var frente = Resources.Load<TextAsset>("Abertura/menu-frente");
+            if (frente != null)
+            {
+                var f = JsonUtility.FromJson<FrenteJ>(frente.text);
+                d.menu = GameSettings.Played ? f.normal : f.primeira;
+            }
+            texFrente[0] = Resources.Load<Texture2D>("Abertura/menu-frente-" + arrumacao + "-pt");
+            texFrente[1] = Resources.Load<Texture2D>("Abertura/menu-frente-" + arrumacao + "-en");
+            if (d.menu != null && sel >= d.menu.Length) sel = 0;
         }
 
         // Troca a tinta dos caixotes, da tampa e dos creditos pela do idioma escolhido em Opcoes > Idioma.
@@ -294,7 +301,8 @@ namespace BananaRoulette
             Sombra(dica);
             var rt = dica.rectTransform;
             rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(1f, 0f);
-            rt.pivot = new Vector2(0.5f, 0f); rt.anchoredPosition = new Vector2(0f, 46f); rt.sizeDelta = new Vector2(0f, 60f);
+            rt.pivot = new Vector2(0.5f, 0f); rt.anchoredPosition = new Vector2(0f, 58f); rt.sizeDelta = new Vector2(0f, 120f);
+            dica.alignment = TextAnchor.LowerCenter; dica.supportRichText = true; // cabe a linha do teste por cima da dica
 
             letreiro = UiFactory.CreateText(go.transform, "Letreiro", "A partida começa!", 120, TextAnchor.MiddleCenter, new Color(1f, 0.84f, 0.2f));
             letreiro.fontStyle = FontStyle.Bold;
@@ -375,6 +383,14 @@ namespace BananaRoulette
                     int em = OpcaoSobOPonteiro(d.menu, true);
                     if (em >= 0 && rato != null && (rato.delta.ReadValue().sqrMagnitude > 0f || clique)) sel = em;
                     if (passo != 0) { sel = (sel + passo + d.menu.Length) % d.menu.Length; SomRetro.Tom(520f, 0.04f, "square", 0.04f); }
+                    // F3 = botao de teste: troca entre "primeira vez" (historia inteira) e "ja jogou" (entrada curta)
+                    if (tec != null && tec.f3Key.wasPressedThisFrame)
+                    {
+                        GameSettings.SetPlayed(!GameSettings.Played);
+                        CarregaFrente(); AplicaIdioma();
+                        SomRetro.Tom(GameSettings.Played ? 520f : 780f, 0.1f, "square", 0.06f);
+                        break;
+                    }
                     if ((clique && em >= 0) || enter) Ativa(d.menu[sel].nome);
                     break;
                 }
@@ -394,7 +410,7 @@ namespace BananaRoulette
                 }
                 case Modo.Pagina:
                     if (pagina == null) { if (qualquer) modo = origem; }
-                    else if (pagina.Entrada(cam)) { pagina.Fechar(); modo = origem; }
+                    else if (pagina.Entrada(cam)) { pagina.Fechar(); modo = origem; if (!perguntando) { CarregaFrente(); AplicaIdioma(); } }
                     break;
                 case Modo.Personagem:
                     if (paginaFrente == null || paginaFrente.Entrada(cam)) FechaPersonagem();
@@ -427,6 +443,13 @@ namespace BananaRoulette
                     pagina.Abrir("primeira");
                     perguntando = true;
                     origem = Modo.Menu; modo = Modo.Pagina;
+                }
+                else if (GameSettings.Played)
+                {
+                    // Ja jogou: nada de historia. A camera so se afasta e o macaco do fundo joga a bomba para a roda.
+                    SomRetro.Ruido(0.5f, 0.2f, 500f, "bandpass");
+                    GameManager.EntradaCurta = true;
+                    IrPara(AppEntry.Screen.Game);
                 }
                 else ComecaAbertura();
             }
@@ -483,7 +506,7 @@ namespace BananaRoulette
                 lugar.transform.rotation = Quaternion.LookRotation(paraACamera);
                 mostra = MacacoVisual.Criar(lugar.transform, Vector3.zero, EscalaDaMostra * e, Aparencia.Pelo(GameSettings.Fur).cor);
                 bombaMostra = new GameObject("Bomba de mostra");
-                pavioDaMostra = BananaCarrier.Montar3D(bombaMostra, EscalaDaMostra * e, GameSettings.Bomb);
+                pavioDaMostra = BananaCarrier.Montar3D(bombaMostra, EscalaDaMostra * e * 1.4f, GameSettings.Bomb); // 1,4: o tamanho para o qual as maos foram posadas
             }
             if (mostra != null) { mostra.transform.parent.gameObject.SetActive(true); mostra.Laco("segura1"); }
             if (bombaMostra != null) bombaMostra.SetActive(true);
@@ -495,13 +518,13 @@ namespace BananaRoulette
             modo = Modo.Personagem;
         }
 
-        // O macaco de mostra vive o ciclo inteiro: a bomba queima na mao dele, ele fica cada vez mais aflito, joga
-        // para o lado antes de estourar, ouve o bum e recebe outra do alto. So ha som de macaco e de pavio aqui.
+        // O macaco de mostra fica calmo, para dar para ver o rosto e os acessorios: so faz o malabarismo leve com a
+        // bomba. O nervoso aparece no suor, que aumenta com o pavio. Quando falta pouco ele joga a bomba para o alto,
+        // ela estoura la em cima, ele relaxa e outra cai na mao. Nenhum grito aqui: so pavio, vento e o estouro.
         BananaCarrier pavioDaMostra;
-        int faseMostra;            // 0 segurando, 1 bomba voando, 2 esperando a nova, 3 nova caindo
-        float queimaMostra, tMostra, proxGrito, proxEstalo;
+        int faseMostra;            // 0 segurando, 1 bomba subindo, 2 esperando a nova, 3 nova caindo
+        float queimaMostra, tMostra, proxEstalo;
         Vector3 jogouDe;
-        static readonly Vector3 OndeEstoura = new Vector3(-7.6f, 0.4f, 5.6f);
 
         void CicloDaMostra(float dt)
         {
@@ -510,60 +533,55 @@ namespace BananaRoulette
 
             if (faseMostra == 0)
             {
-                queimaMostra += dt / 13f;
+                queimaMostra += dt / 11f;
                 pavioDaMostra.UpdateFuseVisual(queimaMostra);
-                mostra.Laco(queimaMostra > 0.7f ? "segura3" : queimaMostra > 0.38f ? "segura2" : "segura1");
+                mostra.Laco("segura1");
+                mostra.Suor = queimaMostra;
 
-                if (Time.time >= proxGrito)
-                {
-                    proxGrito = Time.time + Mathf.Lerp(1.4f, 0.35f, queimaMostra);
-                    float f = queimaMostra > 0.7f ? 760f : queimaMostra > 0.38f ? 620f : 480f;
-                    SomRetro.Grito(f, f * 1.45f, 0.13f, queimaMostra > 0.7f ? 0.35f : 0.22f);
-                }
                 if (Time.time >= proxEstalo)
                 {
-                    proxEstalo = Time.time + Mathf.Lerp(0.45f, 0.08f, queimaMostra);
-                    SomRetro.Ruido(0.05f, 0.04f, 6000f, "highpass");
+                    proxEstalo = Time.time + Mathf.Lerp(0.5f, 0.12f, queimaMostra);
+                    SomRetro.Ruido(0.05f, 0.03f, 6000f, "highpass");
                 }
 
-                if (queimaMostra >= 0.93f)
+                if (queimaMostra >= 0.9f)
                 {
-                    // falta pouco: ele se livra dela
                     faseMostra = 1; tMostra = 0f;
-                    jogouDe = mostra.PontoMaco.position;
-                    pavioDaMostra.SeguirPonto(null);
-                    mostra.Tocar(mostra.transform.InverseTransformPoint(W(OndeEstoura)).x < 0f ? "jogaE" : "jogaD");
-                    SomRetro.Grito(820f, 520f, 0.25f, 0.4f);
-                    SomRetro.Ruido(0.4f, 0.16f, 800f, "bandpass");
+                    mostra.Tocar("jogaCima");
+                    SomRetro.Ruido(0.4f, 0.12f, 800f, "bandpass", 0.25f);
                 }
             }
             else if (faseMostra == 1)
             {
-                float k = Mathf.Clamp01(tMostra / 0.75f);
-                Vector3 p = Vector3.Lerp(jogouDe, W(OndeEstoura), k);
-                p.y += Mathf.Sin(k * Mathf.PI) * 5f * e;
+                // a bomba fica na mao ate o braco subir (0,3 s) e dali segue reto para o alto, perdendo forca
+                const float solta = 0.3f, sobe = 0.75f;
+                if (tMostra < solta) { jogouDe = mostra.PontoMaco.position; return; }
+                pavioDaMostra.SeguirPonto(null);
+                mostra.Suor = 0f;
+                float k = Mathf.Clamp01((tMostra - solta) / sobe);
+                Vector3 p = jogouDe + Vector3.up * (6.5f * e * (1f - (1f - k) * (1f - k)));
                 bombaMostra.transform.position = p;
-                bombaMostra.transform.Rotate(Vector3.forward, 700f * dt, Space.Self);
+                bombaMostra.transform.Rotate(Vector3.forward, 500f * dt, Space.Self);
                 if (k >= 1f)
                 {
-                    Explosao.Criar(W(OndeEstoura), 0.5f);
-                    SomRetro.Ruido(0.7f, 0.6f, 180f, "lowpass");
-                    SomRetro.Tom(90f, 0.5f, "sine", 0.5f, 35f);
+                    Explosao.Criar(p, 0.45f);
+                    SomRetro.Ruido(0.6f, 0.4f, 180f, "lowpass");
+                    SomRetro.Tom(90f, 0.45f, "sine", 0.35f, 35f);
                     bombaMostra.SetActive(false);
-                    mostra.Laco("olhando");
+                    mostra.Laco("parado");
                     faseMostra = 2; tMostra = 0f;
                 }
             }
             else if (faseMostra == 2)
             {
-                if (tMostra > 1.5f)
+                if (tMostra > 1.6f)
                 {
                     // outra bomba vem do alto
                     faseMostra = 3; tMostra = 0f; queimaMostra = 0f;
                     bombaMostra.SetActive(true);
                     pavioDaMostra.UpdateFuseVisual(0f);
                     mostra.Tocar("recebe");
-                    SomRetro.Tom(1500f, 0.45f, "sine", 0.06f, 350f);
+                    SomRetro.Tom(1500f, 0.45f, "sine", 0.05f, 350f);
                 }
             }
             else
@@ -573,8 +591,9 @@ namespace BananaRoulette
                 bombaMostra.transform.Rotate(Vector3.forward, 500f * dt, Space.Self);
                 if (k >= 1f)
                 {
-                    SomRetro.Grito(600f, 950f, 0.14f, 0.4f);
+                    SomRetro.Tom(220f, 0.1f, "sine", 0.12f, 140f); // o peso caindo na mao
                     pavioDaMostra.SeguirPonto(mostra.PontoMaco);
+                    mostra.Laco("segura1");
                     faseMostra = 0; tMostra = 0f;
                 }
             }
@@ -591,7 +610,7 @@ namespace BananaRoulette
             paginaFrente.AoMudar = null;
             paginaFrente.Fechar();
             AplicaIdioma(); // devolve a pintura do menu a frente do caixote
-            if (mostra != null) mostra.transform.parent.gameObject.SetActive(false);
+            if (mostra != null) { mostra.Suor = 0f; mostra.transform.parent.gameObject.SetActive(false); }
             if (bombaMostra != null) bombaMostra.SetActive(false);
             modo = Modo.Menu;
         }
@@ -746,6 +765,7 @@ namespace BananaRoulette
         void Passo(float dt)
         {
             float antes = relogio; relogio += dt;
+            AmbienteSelva.Mudo = modo != Modo.Cena && modo != Modo.Fim; // no menu so toca a musica
             if (modo == Modo.Cena || modo == Modo.Fim)
             {
                 if (modo == Modo.Fim && fimEm > 0f && Time.time >= fimEm) { fimEm = -1f; ComecaPartida(); }
@@ -884,7 +904,9 @@ namespace BananaRoulette
             {
                 case Modo.Espera: return T("Clique para começar", "Click to start");
                 case Modo.Titulo: return T("Clique ou aperte qualquer tecla", "Click or press any key");
-                case Modo.Menu: return T("Clique numa opção · ou setas e Enter", "Click an option · or arrows and Enter");
+                case Modo.Menu:
+                    return "<size=24>" + (GameSettings.Played ? T("F3 (teste): JÁ JOGOU — sem história", "F3 (test): PLAYED — no story") : T("F3 (teste): PRIMEIRA VEZ — história inteira", "F3 (test): FIRST TIME — full story")) + "</size>\n" +
+                        T("Clique numa opção · ou setas e Enter", "Click an option · or arrows and Enter");
                 case Modo.Opcoes: return T("Clique numa opção · Esc volta", "Click an option · Esc goes back");
                 case Modo.Pagina:
                     if (perguntando) return T("Clique numa resposta · Esc volta", "Click an answer · Esc goes back");
