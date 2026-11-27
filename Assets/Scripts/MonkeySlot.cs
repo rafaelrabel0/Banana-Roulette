@@ -15,7 +15,11 @@ namespace BananaRoulette
         /// <summary>Vidas que sobram. Cada explosao tira uma; no zero ele sai voando da roda.</summary>
         public int Lives { get; private set; } = 2;
         /// <summary>O poder que este macaco esta guardando (um por vez).</summary>
-        public PowerUp Guardado = PowerUp.Nenhum;
+        public PowerUp Guardado { get { return Bolsa.Count > 0 ? Bolsa[0] : PowerUp.Nenhum; } }
+
+        /// <summary>Os poderes guardados, na ordem em que foram pegos. Espaco usa o primeiro que servir.</summary>
+        public readonly System.Collections.Generic.List<PowerUp> Bolsa = new System.Collections.Generic.List<PowerUp>();
+        public const int MaxNaBolsa = 3;
 
         // ---------------------------------------------------------------- vidas: bananas no chao, ao lado do macaco
         // A banana da vez fica onde o pe dele bate (animacao "pisa"); as outras fazem fila para fora.
@@ -163,14 +167,16 @@ namespace BananaRoulette
             casca.SetActive(false);
             _casca = casca.transform;
 
-            // o poder guardado fica no chao do outro lado (a direita dele), para todo mundo ver o que cada um tem
-            _lugarDoItem = new Vector3(-_lugarDoPe.x * 1.2f, 0f, _lugarDoPe.z);
+            // os poderes guardados ficam no chao atras dele, do lado direito, em fila para tras: fora do caminho dos bracos
+            _lugarDoItem = new Vector3(1.45f, 0f, -0.7f) * (esc / 0.25f);
+            _passoDoItem = new Vector3(0.45f, 0f, -0.85f) * (esc / 0.25f);
             _escalaDoItem = esc * 1.25f;
         }
 
-        private Vector3 _lugarDoItem;
+        private Vector3 _lugarDoItem, _passoDoItem;
         private float _escalaDoItem = 0.2f;
-        private GameObject _item;
+        private readonly System.Collections.Generic.List<GameObject> _itens = new System.Collections.Generic.List<GameObject>();
+        private int _bolsaMostrada;
 
         /// <summary>Onde o poder guardado deste macaco fica, no mundo.</summary>
         public Vector3 LugarDoItem { get { return transform.TransformPoint(_lugarDoItem); } }
@@ -200,18 +206,21 @@ namespace BananaRoulette
             if (_casca != null && _casca.gameObject.activeSelf)
                 _casca.localScale = Vector3.Lerp(_casca.localScale, Vector3.one, Time.deltaTime * 10f);
 
-            PowerUp tem = IsAlive ? Guardado : PowerUp.Nenhum;
-            if (_seloDe != tem)
+            int marca = 0;
+            if (IsAlive) { marca = Bolsa.Count; for (int i = 0; i < Bolsa.Count; i++) marca = marca * 16 + (int)Bolsa[i]; }
+            if (marca == _bolsaMostrada) return;
+            _bolsaMostrada = marca;
+            foreach (GameObject velho in _itens) if (velho != null) Destroy(velho);
+            _itens.Clear();
+            if (!IsAlive) return;
+            for (int i = 0; i < Bolsa.Count; i++)
             {
-                _seloDe = tem;
-                if (_item != null) Destroy(_item);
-                _item = ItemPoder.Criar(tem, transform, _escalaDoItem);
-                if (_item != null)
-                {
-                    _item.transform.localPosition = _lugarDoItem;
-                    _item.transform.localRotation = Quaternion.Euler(0f, -35f, 0f);
-                    _item.AddComponent<Porte>().alvo = _escalaDoItem;
-                }
+                GameObject it = ItemPoder.Criar(Bolsa[i], transform, _escalaDoItem);
+                if (it == null) continue;
+                it.transform.localPosition = _lugarDoItem + _passoDoItem * i;
+                it.transform.localRotation = Quaternion.Euler(0f, -35f + 25f * i, 0f);
+                it.AddComponent<Porte>().alvo = _escalaDoItem;
+                _itens.Add(it);
             }
         }
 

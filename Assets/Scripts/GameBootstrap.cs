@@ -130,6 +130,7 @@ namespace BananaRoulette
                     {
                         var gerenteDosRecados = _manager;
                         Recados.Criar(slots, () => gerenteDosRecados.HolderIndex, () => gerenteDosRecados.LastPasserIndex, camera, _canvas.transform);
+                        _hud.Painel = PainelDaPartida.Criar(_hud.transform, slots);
                     }
                     _manager.StartMatch();
                     break;

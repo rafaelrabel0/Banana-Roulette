@@ -60,10 +60,10 @@ namespace BananaRoulette
 
         void MontarTela(Transform canvas)
         {
-            // botao MENU, no canto de baixo, acima da dica do Esc
-            var botao = UiFactory.CreateButton(canvas, "BotaoMenu", "MENU", new Vector2(170f, 58f), 28,
+            // botao MENU, pequeno, no canto de cima a esquerda: embaixo ficam os rostos, as vidas e os poderes
+            var botao = UiFactory.CreateButton(canvas, "BotaoMenu", "MENU", new Vector2(130f, 44f), 22,
                 new Color32(0x24, 0x18, 0x0A, 0xD8), Palette.BananaYellow, out rotuloBotao);
-            UiFactory.Anchor(botao, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28f, 62f), new Vector2(170f, 58f));
+            UiFactory.Anchor(botao, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(34f, -112f), new Vector2(130f, 44f));
             botao.onClick.AddListener(Alternar);
 
             // alerta: um botao grande no meio da tela

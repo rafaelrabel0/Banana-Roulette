@@ -144,15 +144,24 @@ namespace BananaRoulette
         /// </summary>
         public bool UsarPowerUp(MonkeySlot quem)
         {
-            PowerUp p = quem.Guardado;
-            if (p == PowerUp.Nenhum || !quem.IsAlive || !_running) return false;
+            if (quem.Bolsa.Count == 0 || !quem.IsAlive || !_running) return false;
             bool rodadaCorrendo = Current == State.Holding || Current == State.Passing;
             bool comABomba = rodadaCorrendo && _slots[_holderIndex] == quem;
             MonkeySlot alvo = _slots[_holderIndex];
 
-            if (PowerUps.EhAtaque(p) && (comABomba || Current != State.Holding || _solverAtual == null)) return false;
-            if (PowerUps.PrecisaDaBomba(p) && (!comABomba || Current != State.Holding || _solverAtual == null)) return false;
-            if (p == PowerUp.PavioMolhado && !rodadaCorrendo) return false;
+            // Usa o primeiro da bolsa que serve agora: com a bomba na mao, o primeiro de ajuda; sem ela, o primeiro
+            // de ataque (vai em quem esta com a bomba) ou uma ajuda que valha a qualquer hora.
+            int qual = -1;
+            for (int i = 0; i < quem.Bolsa.Count && qual < 0; i++)
+            {
+                PowerUp c = quem.Bolsa[i];
+                if (PowerUps.EhAtaque(c) && (comABomba || Current != State.Holding || _solverAtual == null)) continue;
+                if (PowerUps.PrecisaDaBomba(c) && (!comABomba || Current != State.Holding || _solverAtual == null)) continue;
+                if (c == PowerUp.PavioMolhado && !rodadaCorrendo) continue;
+                qual = i;
+            }
+            if (qual < 0) return false;
+            PowerUp p = quem.Bolsa[qual];
 
             switch (p)
             {
@@ -199,7 +208,7 @@ namespace BananaRoulette
                     break;
             }
 
-            quem.Guardado = PowerUp.Nenhum;
+            quem.Bolsa.RemoveAt(qual);
             MostraInventario();
             bool ataque = PowerUps.EhAtaque(p);
             StartCoroutine(MostraUso(p, quem, alvo, ataque));
@@ -350,7 +359,7 @@ namespace BananaRoulette
             _holderIndex = 0;
             bool curta = EntradaCurta && Lancador != null && Lancador.PontoMaco != null;
             EntradaCurta = false;
-            _proximaOferta = Time.time + 8f;
+            _proximaOferta = Time.time + 3f;
             if (curta) { _banana.UpdateFuseVisual(0f); _banana.SeguirPonto(Lancador.PontoMaco); Lancador.Laco("segura1"); }
             else _banana.SnapTo(_slots[_holderIndex]);
             _hud.SetAliveCount(AliveCount, _config.monkeyCount);
@@ -448,7 +457,7 @@ namespace BananaRoulette
             };
             solver.OnPowerUpGot += () =>
             {
-                holder.Guardado = _oferta;
+                if (holder.Bolsa.Count < MonkeySlot.MaxNaBolsa) holder.Bolsa.Add(_oferta);
                 Trace(QuemE(holder) + " pegou o poder " + _oferta);
                 _oferta = PowerUp.Nenhum;
                 SomeOferta(true);
@@ -471,9 +480,11 @@ namespace BananaRoulette
             SomeOferta(false); // o do turno anterior, se ninguem pegou
             _hud.HidePowerUp();
             // De vez em quando, nao a cada turno: depois de aparecer um, o proximo demora.
-            if (holder.Guardado == PowerUp.Nenhum && Time.time >= _proximaOferta && Random.value < 0.4f)
+            // Quem ja tem um na bolsa recebe bem menos. O jogador recebe mais que os bots, para sempre ver poder na partida.
+            float chance = (holder.IsHuman ? 0.9f : 0.55f) * (holder.Bolsa.Count == 0 ? 1f : 0.4f);
+            if (holder.Bolsa.Count < MonkeySlot.MaxNaBolsa && Time.time >= _proximaOferta && Random.value < chance)
             {
-                _proximaOferta = Time.time + Random.Range(10f, 18f);
+                _proximaOferta = Time.time + Random.Range(4f, 8f);
                 _oferta = PowerUps.Sortear();
                 var seqPoder = SequenceGenerator.Generate(3);
                 if (seqPoder[0] == sequence[0]) seqPoder[0] = (ArrowDirection)(((int)seqPoder[0] + 1) % 4);

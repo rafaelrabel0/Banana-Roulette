@@ -52,6 +52,8 @@ namespace BananaRoulette
         // Suor: gotas que saltam da cabeca. 0 = nenhuma, 1 = muitas.
         public float Suor;
         Transform cabeca;
+        /// <summary>O no da cabeca (pescoco). Serve para tirar o retrato do macaco.</summary>
+        public Transform Cabeca { get { return cabeca; } }
         Transform[] gotas; float[] idadeGota; Vector3[] velGota; float proxGota;
         readonly Dictionary<string, ClipeJ> porNome = new Dictionary<string, ClipeJ>();
         ClipeJ laco, umaVez;

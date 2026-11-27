@@ -113,6 +113,9 @@ namespace BananaRoulette
 
         private RectTransform _puRow;
         private Text _puLabel, _invText, _livesText;
+
+        /// <summary>Painel de baixo (rostos, bananas de vida, poderes). Quando existe, os textos antigos ficam vazios.</summary>
+        public PainelDaPartida Painel;
         private readonly List<KeyCapWidget> _puKeys = new List<KeyCapWidget>();
 
         private Text NovoTexto(string nome, int tamanho, TextAnchor ancora, Color cor)
@@ -180,12 +183,12 @@ namespace BananaRoulette
         }
 
         /// <summary>Canto de baixo: o poder guardado e a tecla para usar. Texto vazio esconde.</summary>
-        public void SetInventory(string texto) { GarantePoder(); _invText.text = texto; }
+        public void SetInventory(string texto) { GarantePoder(); _invText.text = Painel != null ? "" : texto; }
 
         public void SetLives(int vidas)
         {
             GarantePoder();
-            _livesText.text = (Loc.Current == Language.Portuguese ? "VIDAS: " : "LIVES: ") + vidas;
+            _livesText.text = Painel != null ? "" : (Loc.Current == Language.Portuguese ? "VIDAS: " : "LIVES: ") + vidas;
         }
 
         /// <summary>
@@ -229,7 +232,7 @@ namespace BananaRoulette
         private void RefreshStaticText()
         {
             SetAliveCount(_aliveCache, _totalCache);
-            if (_escHintText != null) _escHintText.text = Loc.Get("game.esc");
+            if (_escHintText != null) _escHintText.text = Painel != null ? "" : Loc.Get("game.esc");
         }
 
         private void BuildEndPanel(Transform root)
@@ -402,7 +405,7 @@ namespace BananaRoulette
         {
             _aliveCache = alive;
             _totalCache = total;
-            _aliveText.text = Loc.Format("game.monkeys", alive, total);
+            _aliveText.text = Painel != null ? "" : Loc.Format("game.monkeys", alive, total);
         }
 
         public void SetStatus(string message, Color color)
@@ -419,7 +422,7 @@ namespace BananaRoulette
 
         public void SetEscHint(string message)
         {
-            if (_escHintText != null) _escHintText.text = message;
+            if (_escHintText != null) _escHintText.text = Painel != null ? "" : message;
         }
 
         public void SetFuseDebug(bool enabled, float remaining)
