@@ -125,6 +125,8 @@ namespace BananaRoulette
             if (EntrarNoTitulo) { modo = modoAnt = Modo.Titulo; relogio = 8f; jaCarimbou = true; EntrarNoTitulo = false; }
             else if (jaCarimbou) { modo = modoAnt = Modo.Menu; relogio = 8f; }
             MusicaRetro.Tocar(MusicaRetro.Clima.Menu);
+            MusicaRetro.Abafar(false);
+            MusicaRetro.Volume(1f, 2.5f); // quem chega de uma partida ouve a musica abrir aos poucos
         }
 
         IEnumerator Start()
@@ -448,15 +450,102 @@ namespace BananaRoulette
                 lugar.transform.position = LugarDoMacaco;
                 lugar.transform.rotation = Quaternion.LookRotation(new Vector3(CamPersonagemP.x - LugarDoMacaco.x, 0f, CamPersonagemP.z - LugarDoMacaco.z));
                 mostra = MacacoVisual.Criar(lugar.transform, Vector3.zero, EscalaDaMostra, Aparencia.Pelo(GameSettings.Fur).cor);
-                var modeloBomba = Resources.Load<GameObject>("Jogo/maco-jogo");
-                if (modeloBomba != null) { bombaMostra = Instantiate(modeloBomba); bombaMostra.name = "Bomba de mostra"; bombaMostra.transform.localScale = Vector3.one * EscalaDaMostra; VisualRetro.Converter(bombaMostra); }
+                bombaMostra = new GameObject("Bomba de mostra");
+                pavioDaMostra = BananaCarrier.Montar3D(bombaMostra, EscalaDaMostra, GameSettings.Bomb);
             }
             if (mostra != null) { mostra.transform.parent.gameObject.SetActive(true); mostra.Laco("segura1"); }
             if (bombaMostra != null) bombaMostra.SetActive(true);
+            faseMostra = 0; queimaMostra = 0f; tMostra = 0f;
+            if (pavioDaMostra != null && mostra != null) { pavioDaMostra.SeguirPonto(mostra.PontoMaco); pavioDaMostra.UpdateFuseVisual(0f); }
             VesteMostra();
             paginaFrente.AoMudar = VesteMostra;
             paginaFrente.Abrir("personagem");
             modo = Modo.Personagem;
+        }
+
+        // O macaco de mostra vive o ciclo inteiro: a bomba queima na mao dele, ele fica cada vez mais aflito, joga
+        // para o lado antes de estourar, ouve o bum e recebe outra do alto. So ha som de macaco e de pavio aqui.
+        BananaCarrier pavioDaMostra;
+        int faseMostra;            // 0 segurando, 1 bomba voando, 2 esperando a nova, 3 nova caindo
+        float queimaMostra, tMostra, proxGrito, proxEstalo;
+        Vector3 jogouDe;
+        static readonly Vector3 OndeEstoura = new Vector3(-7.6f, 0.4f, 5.6f);
+
+        void CicloDaMostra(float dt)
+        {
+            if (mostra == null || pavioDaMostra == null || mostra.PontoMaco == null) return;
+            tMostra += dt;
+
+            if (faseMostra == 0)
+            {
+                queimaMostra += dt / 13f;
+                pavioDaMostra.UpdateFuseVisual(queimaMostra);
+                mostra.Laco(queimaMostra > 0.7f ? "segura3" : queimaMostra > 0.38f ? "segura2" : "segura1");
+
+                if (Time.time >= proxGrito)
+                {
+                    proxGrito = Time.time + Mathf.Lerp(1.4f, 0.35f, queimaMostra);
+                    float f = queimaMostra > 0.7f ? 760f : queimaMostra > 0.38f ? 620f : 480f;
+                    SomRetro.Grito(f, f * 1.45f, 0.13f, queimaMostra > 0.7f ? 0.35f : 0.22f);
+                }
+                if (Time.time >= proxEstalo)
+                {
+                    proxEstalo = Time.time + Mathf.Lerp(0.45f, 0.08f, queimaMostra);
+                    SomRetro.Ruido(0.05f, 0.04f, 6000f, "highpass");
+                }
+
+                if (queimaMostra >= 0.93f)
+                {
+                    // falta pouco: ele se livra dela
+                    faseMostra = 1; tMostra = 0f;
+                    jogouDe = mostra.PontoMaco.position;
+                    pavioDaMostra.SeguirPonto(null);
+                    mostra.Tocar(mostra.transform.InverseTransformPoint(OndeEstoura).x < 0f ? "jogaE" : "jogaD");
+                    SomRetro.Grito(820f, 520f, 0.25f, 0.4f);
+                    SomRetro.Ruido(0.4f, 0.16f, 800f, "bandpass");
+                }
+            }
+            else if (faseMostra == 1)
+            {
+                float k = Mathf.Clamp01(tMostra / 0.75f);
+                Vector3 p = Vector3.Lerp(jogouDe, OndeEstoura, k);
+                p.y += Mathf.Sin(k * Mathf.PI) * 5f;
+                bombaMostra.transform.position = p;
+                bombaMostra.transform.Rotate(Vector3.forward, 700f * dt, Space.Self);
+                if (k >= 1f)
+                {
+                    Explosao.Criar(OndeEstoura, 0.8f);
+                    SomRetro.Ruido(0.7f, 0.6f, 180f, "lowpass");
+                    SomRetro.Tom(90f, 0.5f, "sine", 0.5f, 35f);
+                    bombaMostra.SetActive(false);
+                    mostra.Laco("olhando");
+                    faseMostra = 2; tMostra = 0f;
+                }
+            }
+            else if (faseMostra == 2)
+            {
+                if (tMostra > 1.5f)
+                {
+                    // outra bomba vem do alto
+                    faseMostra = 3; tMostra = 0f; queimaMostra = 0f;
+                    bombaMostra.SetActive(true);
+                    pavioDaMostra.UpdateFuseVisual(0f);
+                    mostra.Tocar("recebe");
+                    SomRetro.Tom(1500f, 0.45f, "sine", 0.06f, 350f);
+                }
+            }
+            else
+            {
+                float k = Mathf.Clamp01(tMostra / 0.45f);
+                bombaMostra.transform.position = mostra.PontoMaco.position + Vector3.up * (16f * (1f - k * k));
+                bombaMostra.transform.Rotate(Vector3.forward, 500f * dt, Space.Self);
+                if (k >= 1f)
+                {
+                    SomRetro.Grito(600f, 950f, 0.14f, 0.4f);
+                    pavioDaMostra.SeguirPonto(mostra.PontoMaco);
+                    faseMostra = 0; tMostra = 0f;
+                }
+            }
         }
 
         void VesteMostra()
@@ -643,8 +732,7 @@ namespace BananaRoulette
             }
 
             // a bomba de mostra acompanha a mao do macaco de mostra
-            if (modo == Modo.Personagem && bombaMostra != null && mostra != null && mostra.PontoMaco != null)
-                bombaMostra.transform.SetPositionAndRotation(mostra.PontoMaco.position, mostra.PontoMaco.rotation);
+            if (modo == Modo.Personagem && bombaMostra != null) CicloDaMostra(dt);
 
             // creditos no chao
             Color cc = matCreditos.color;

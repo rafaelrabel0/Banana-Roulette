@@ -23,14 +23,20 @@ namespace BananaRoulette
 
         public static Screen Next = Screen.Menu;
 
+        private static UnityEngine.AsyncOperation carga;
+
         public static void GoTo(Screen screen)
         {
+            if (carga != null && !carga.isDone) return; // ja ha uma troca a caminho
             Next = screen;
             string cena = screen == Screen.Menu ? CenaDoMenu : CenaDoJogo;
 
             // Cena fora da lista de build (File > Build Profiles): recarrega a atual, como era antes.
-            if (Application.CanStreamedLevelBeLoaded(cena)) SceneManager.LoadScene(cena);
-            else SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            // A musica baixa antes da troca e sobe de novo na cena nova (quem chega chama MusicaRetro.Volume(1, ...)).
+            // A cena carrega em segundo plano, para o tranco ser o menor possivel.
+            MusicaRetro.Volume(0.3f, 0.25f);
+            if (Application.CanStreamedLevelBeLoaded(cena)) carga = SceneManager.LoadSceneAsync(cena);
+            else carga = SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex);
         }
     }
 }

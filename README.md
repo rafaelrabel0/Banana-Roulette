@@ -190,7 +190,9 @@ e acrescentar o nome na lista de `Aparencia.cs`.
   entra na tela "aperte qualquer tecla" (`PausaNoCaixote.cs`, `MenuAbertura.EntrarNoTitulo`).
 - **Tutorial:** a bomba cai na mão do macaco, as falas ficam no topo e avançam com Espaço. O pavio
   queima enquanto se lê e para em um terço até a hora de digitar (`TutorialDirector.cs`).
-- **Explosão:** o macaco não morre nem fica tostado; sai voando para o lado, gritando (`MonkeySlot.VoaLonge`).
+- **Explosão:** clarão, bolas de fogo e marca de queimado no chão (`Explosao.cs`); o macaco não morre nem fica
+  tostado, sai voando para o lado, gritando (`MonkeySlot.VoaLonge`). O macaco da abertura fica lá atrás com as
+  bombas acesas e joga uma nova para a roda a cada rodada (`GameManager.Lancador`).
 - **Sons:** acerto, erro, arremesso, susto de quem recebe, risada de quem jogou, gritos de quem segura
   (mais rápidos conforme o pavio acaba), estalo do pavio, explosão; e a floresta ao fundo
   (`AmbienteSelva.cs`). Tudo fabricado por código em `SomRetro.cs`.

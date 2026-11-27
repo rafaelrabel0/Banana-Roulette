@@ -31,6 +31,69 @@ namespace BananaRoulette
         private Color[] _corpoBase;
         private float _raioPavio;
 
+        private Transform _ponto;
+
+        /// <summary>Faz a bomba acompanhar um ponto qualquer (a mao do macaco de mostra, no menu). Nulo solta.</summary>
+        public void SeguirPonto(Transform ponto) { _ponto = ponto; }
+
+        /// <summary>
+        /// Monta o maco de dinamite em 3D dentro de "root": modelo, pavio que encurta, faisca e materiais proprios.
+        /// Devolve nulo se o modelo nao existir. escala = tamanho do modelo; corBomba = posicao em Aparencia.Bombas.
+        /// </summary>
+        public static BananaCarrier Montar3D(GameObject root, float escala, int corBomba)
+        {
+            var modelo = Resources.Load<GameObject>("Jogo/maco-jogo");
+            if (modelo == null) return null;
+
+            var copia = Instantiate(modelo, root.transform);
+            copia.transform.localScale = Vector3.one * escala;
+            VisualRetro.Converter(copia);
+            Aparencia.PintaBomba(copia, corBomba);
+
+            Transform faisca = null, pavioVelho = null;
+            foreach (Transform t in copia.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name.StartsWith("Faisca")) faisca = t;
+                else if (t.name.StartsWith("Pavio")) pavioVelho = t;
+            }
+            if (faisca == null) { Destroy(copia); return null; }
+            if (pavioVelho != null) pavioVelho.gameObject.SetActive(false); // o cordao pronto sai; entra o que encurta
+
+            var cordao = new GameObject("Pavio vivo", typeof(MeshFilter), typeof(MeshRenderer));
+            cordao.transform.SetParent(faisca.parent, false);
+            var tinta = new Material(Shader.Find("BananaRoulette/Retro"));
+            tinta.SetColor("_BaseColor", new Color32(0x5A, 0x3A, 0x1C, 0xFF)); tinta.SetFloat("_SemLuz", 1f); tinta.SetFloat("_Cull", 0f);
+            cordao.GetComponent<MeshRenderer>().sharedMaterial = tinta;
+
+            // corpo do maco com materiais proprios, para poder clarear quando o pavio esta no fim
+            var corpo = new System.Collections.Generic.List<Material>();
+            foreach (Renderer r in copia.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] ms = r.sharedMaterials;
+                bool mudou = false;
+                for (int i = 0; i < ms.Length; i++)
+                {
+                    if (ms[i] == null || !ms[i].name.StartsWith("Dinamite")) continue;
+                    ms[i] = new Material(ms[i]) { name = ms[i].name };
+                    corpo.Add(ms[i]); mudou = true;
+                }
+                if (mudou) r.sharedMaterials = ms;
+            }
+
+            var rFaisca = faisca.GetComponentInChildren<Renderer>();
+            if (rFaisca != null) rFaisca.sharedMaterial = new Material(rFaisca.sharedMaterial);
+
+            // caminho do pavio na previa (eixo do three.js); aqui o X entra espelhado
+            var curva = new[]
+            {
+                new Vector3(-2f, 0f, 0f), new Vector3(-2.65f, 0.3f, 0.1f), new Vector3(-3.25f, -0.4f, 0.3f),
+                new Vector3(-3.8f, -1.08f, 0.2f), new Vector3(-4.4f, -1.1f, -0.1f)
+            };
+            var carrier = root.AddComponent<BananaCarrier>();
+            carrier.Setup3D(faisca, rFaisca, cordao.GetComponent<MeshFilter>(), curva, 0.09f, corpo.ToArray());
+            return carrier;
+        }
+
         /// <summary>
         /// Liga o modelo 3D. curva = pontos por onde o pavio passa (do maco ate a ponta), no espaco do modelo;
         /// pavio = objeto vazio com MeshFilter onde o cordao e redesenhado conforme queima.
@@ -119,7 +182,7 @@ namespace BananaRoulette
         }
 
         /// <summary>Voo em arco ate o novo dono. Puramente visual: a posse ja mudou.</summary>
-        public IEnumerator FlyTo(MonkeySlot target, float duration)
+        public IEnumerator FlyTo(MonkeySlot target, float duration, float height = 2.2f)
         {
             _inFlight = true;
             Vector3 start = transform.position;
@@ -130,7 +193,7 @@ namespace BananaRoulette
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / duration);
                 Vector3 flat = Vector3.Lerp(start, target.HandPosition, k);
-                flat.y += Mathf.Sin(k * Mathf.PI) * 2.2f;
+                flat.y += Mathf.Sin(k * Mathf.PI) * height;
                 transform.position = flat;
                 transform.Rotate(Vector3.forward, 900f * Time.deltaTime, Space.Self);
                 yield return null;
@@ -173,8 +236,10 @@ namespace BananaRoulette
 
         private void Update()
         {
+            if (_ponto != null) { transform.SetPositionAndRotation(_ponto.position, _ponto.rotation); }
             Quaternion giro;
-            if (!_inFlight && _holder != null && _holder.TryGetHandRotation(out giro))
+            if (_ponto != null) { }
+            else if (!_inFlight && _holder != null && _holder.TryGetHandRotation(out giro))
             {
                 // 3D: a bomba segue a mao do macaco, que ja faz o malabarismo na animacao
                 transform.SetPositionAndRotation(_holder.HandPosition, giro);

@@ -92,7 +92,8 @@ namespace BananaRoulette
             if (Aberta) return;
             Aberta = true; pressa = 1f;
             pagina.Abrir("pausa");
-            if (hud != null) { hud.SetKeysVisible(false); hud.SuspendEnd(true); }
+            if (hud != null) { hud.SetKeysVisible(false); hud.SuspendEnd(true); if (hud.TopFuse != null) hud.TopFuse.Mostrar3D(false); }
+            MusicaRetro.Abafar(true);
             SomRetro.Tom(300f, 0.08f, "square", 0.05f);
         }
 
@@ -101,7 +102,8 @@ namespace BananaRoulette
             if (!Aberta) return;
             Aberta = false; pressa = comPressa;
             pagina.Fechar();
-            if (hud != null) { hud.SetKeysVisible(true); hud.SuspendEnd(false); }
+            if (hud != null) { hud.SetKeysVisible(true); hud.SuspendEnd(false); if (hud.TopFuse != null) hud.TopFuse.Mostrar3D(true); }
+            MusicaRetro.Abafar(false);
         }
 
         bool saindo;
@@ -113,8 +115,9 @@ namespace BananaRoulette
             saindo = true;
             pagina.Fechar();
             alerta.SetActive(false);
-            if (hud != null) hud.SetVisible(false);
+            if (hud != null) { if (hud.TopFuse != null) hud.TopFuse.Mostrar3D(false); hud.SetVisible(false); }
             MusicaRetro.Tocar(MusicaRetro.Clima.Menu);
+            MusicaRetro.Abafar(true); // continua abafada durante o caminho; a tela do titulo abre o som aos poucos
 
             Transform mundo = face.root;
             Vector3 dePos = cam.transform.position; Quaternion deGiro = cam.transform.rotation; float deCampo = cam.fieldOfView;

@@ -39,6 +39,18 @@ namespace BananaRoulette
 
         public static void Tocar(Clima clima) { Garante(); pedido = (int)clima; }
 
+        static volatile float ganhoAlvo = 1f, ganhoPorSegundo = 1f, abafaAlvo;
+
+        /// <summary>Musica abafada e mais baixa (menu da partida aberto). Entra e sai aos poucos.</summary>
+        public static void Abafar(bool sim) { abafaAlvo = sim ? 1f : 0f; }
+
+        /// <summary>Leva o volume ate "alvo" (0 a 1) em "segundos". Usado nas trocas de tela, para nao haver corte.</summary>
+        public static void Volume(float alvo, float segundos)
+        {
+            ganhoPorSegundo = 1f / Mathf.Max(0.05f, segundos);
+            ganhoAlvo = Mathf.Clamp01(alvo);
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Garante()
         {
@@ -159,13 +171,18 @@ namespace BananaRoulette
             padroes[(int)Clima.Tensao] = p;
 
             // Jogo: o tema; com o pavio acabando entram timpano, caixa e cordas tremidas (e o andamento sobe)
-            p = new Padrao { bpm = 124f };
-            Add(p, Flauta, 0.55f, TemaMel);
-            Add(p, Clarinete, 0.3f, TemaMel.Replace("4", "3").Replace("5", "4").Replace("6", "5"));
-            Add(p, Beliscada, 0.65f, TemaBaixo);
-            Contratempo(p, 0.24f, TemaAcordes);
-            Add(p, Bloco, 0.16f, "x . . . x . . .");
-            Add(p, Timpano, 0.6f, "C2 . . . G1 . . .", 45);
+            // E o meio termo entre a tensao do fim da abertura e a brincadeira do tema: a mesma melodia, em tom
+            // menor, com as cordas graves tremendo por baixo e o timpano marcando desde o comeco.
+            p = new Padrao { bpm = 130f };
+            string menor = TemaMel.Replace("E", "Eb").Replace("A", "Ab");
+            Add(p, Flauta, 0.5f, menor);
+            Add(p, Clarinete, 0.32f, menor.Replace("4", "3").Replace("5", "4").Replace("6", "5"));
+            Add(p, Beliscada, 0.65f, TemaBaixo.Replace("E", "Eb").Replace("A", "Ab"));
+            Contratempo(p, 0.22f, "Eb4,G4,C5", "D4,G4,B4", "Eb4,G4,C5", "D4,F4,B4", "Eb4,G4,C5", "F4,Ab4,C5", "Eb4,G4,C5", "Eb4,G4,C5");
+            Add(p, Bloco, 0.14f, "x . . . x . . .");
+            Add(p, Tremida, 0.16f, "C3 - - - - - - - | B2 - - - - - - - | C3 - - - - - - - | D3 - - - G2 - - -");
+            Add(p, Timpano, 0.38f, "C2 . . . . . . . | G1 . . . . . . .");
+            Add(p, Timpano, 0.6f, ". . . . G1 . . .", 45);
             Add(p, Caixa, 0.15f, ". . x . . . x x", 60);
             Add(p, Tremida, 0.32f, "G4 - - - - - - - | Ab4 - - - - - - - | G4 - - - - - - - | B4 - - - - - - -", 70);
             Add(p, Caixa, 0.12f, "x x x x x x x x", 88);
@@ -180,6 +197,7 @@ namespace BananaRoulette
         int climaAtual = -1, passo;
         double ateOPasso;
         Voz[] vozes = new Voz[0];
+        float ganho = 1f, abafa, filtroAbafa;
         uint sorte = 22222;
 
         float Ruido() { sorte = sorte * 1664525u + 1013904223u; return (sorte >> 9) / 4194304f - 1f; }
@@ -227,6 +245,12 @@ namespace BananaRoulette
                 for (int v = 0; v < vozes.Length; v++) soma += Amostra(ref vozes[v], dt);
                 soma *= 0.2f * volume;
                 soma = soma / (1f + Mathf.Abs(soma)); // segura o pico sem estalar
+
+                // volume e abafado andam devagar ate o alvo, amostra por amostra: nada de degrau no som
+                ganho = Mathf.MoveTowards(ganho, ganhoAlvo, ganhoPorSegundo * dt);
+                abafa += (abafaAlvo - abafa) * 0.0003f;
+                filtroAbafa += (soma - filtroAbafa) * 0.05f;
+                soma = Mathf.Lerp(soma, filtroAbafa * 1.25f, abafa) * ganho * (1f - 0.4f * abafa);
 
                 for (int c = 0; c < canais; c++) dados[i + c] += soma;
             }

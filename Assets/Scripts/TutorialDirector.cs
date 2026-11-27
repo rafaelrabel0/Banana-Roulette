@@ -398,6 +398,9 @@ namespace BananaRoulette
             _banana.gameObject.SetActive(false);
 
             if (_shake != null) _shake.Shake(0.45f, 0.55f);
+            Explosao.Criar(victim.HandPosition, 1f);
+            SomRetro.Ruido(0.7f, 0.7f, 180f, "lowpass");
+            SomRetro.Tom(90f, 0.5f, "sine", 0.6f, 35f);
             if (_flashLight != null) StartCoroutine(Flash(victim.HandPosition));
             if (_hud.TopFuse != null) StartCoroutine(_hud.TopFuse.Explode());
 

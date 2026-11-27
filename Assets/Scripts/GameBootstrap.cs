@@ -55,6 +55,8 @@ namespace BananaRoulette
 
             GameSettings.Load();
             MonkeySlot.Tensao = 0f; // sobra da partida anterior
+            MusicaRetro.Abafar(false);
+            MusicaRetro.Volume(1f, 2.2f); // a musica sobe aos poucos depois da troca de tela
 
             if (usar3D && Resources.Load<GameObject>("Jogo/macaco-jogo") == null) usar3D = false;
 
@@ -87,6 +89,7 @@ namespace BananaRoulette
                 case AppEntry.Screen.Game:
                     _manager = gameObject.AddComponent<GameManager>();
                     _manager.Setup(config, slots, solvers, _banana, _hud, fuse, shake, flash);
+                    if (usar3D) _manager.Lancador = BuildLancador();
                     if (usar3D && _faceDoMenu != null)
                     {
                         var gerente = _manager;
@@ -248,6 +251,39 @@ namespace BananaRoulette
             }
         }
 
+        /// <summary>
+        /// O macaco da abertura continua la atras, assustado, cercado de bombas acesas pela bituca.
+        /// Depois de cada explosao e ele quem joga a bomba nova para a roda: por isso sempre ha mais uma.
+        /// </summary>
+        private MacacoVisual BuildLancador()
+        {
+            var lugar = new GameObject("Macaco lancador");
+            lugar.transform.position = new Vector3(0.4f, 0f, config.circleRadius + 4.6f); // no vao entre os dois macacos do fundo
+            lugar.transform.rotation = Quaternion.LookRotation(new Vector3(-lugar.transform.position.x, 0f, -lugar.transform.position.z));
+            var macaco = MacacoVisual.Criar(lugar.transform, Vector3.zero, Escala, new Color32(0x4A, 0x2A, 0x14, 0xFF));
+            if (macaco == null) return null;
+            macaco.Laco("olhando");
+
+            // as outras bombas acesas, no chao ao lado dele
+            var modelo = Resources.Load<GameObject>("Jogo/maco-jogo");
+            if (modelo != null)
+            {
+                Vector3[] onde = { new Vector3(-1.9f, 0.32f, 0.9f), new Vector3(1.8f, 0.32f, 1.2f), new Vector3(2.3f, 0.32f, -0.6f) };
+                float[] giro = { 25f, -40f, 110f };
+                for (int i = 0; i < onde.Length; i++)
+                {
+                    var b = Instantiate(modelo, lugar.transform);
+                    b.name = "Bomba acesa " + i;
+                    b.transform.localPosition = onde[i];
+                    b.transform.localRotation = Quaternion.Euler(0f, giro[i], 0f);
+                    b.transform.localScale = Vector3.one * Escala * 1.2f;
+                    VisualRetro.Converter(b);
+                    Aparencia.PintaBomba(b, GameSettings.Bomb);
+                }
+            }
+            return macaco;
+        }
+
         private void BuildLighting()
         {
             var go = new GameObject("Directional Light", typeof(Light));
@@ -371,7 +407,7 @@ namespace BananaRoulette
         private BananaCarrier BuildBanana()
         {
             var root = new GameObject("BananaDeDinamite");
-            if (usar3D && BuildBanana3D(root)) return root.GetComponent<BananaCarrier>();
+            if (usar3D && BananaCarrier.Montar3D(root, Escala * 1.4f, GameSettings.Bomb) != null) return root.GetComponent<BananaCarrier>();
 
             var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             body.name = "Body";
@@ -404,61 +440,6 @@ namespace BananaRoulette
                 spark.GetComponent<Renderer>());
 
             return carrier;
-        }
-
-        /// <summary>O maco de dinamite da previa, com o pavio que encurta de verdade.</summary>
-        private bool BuildBanana3D(GameObject root)
-        {
-            var modelo = Resources.Load<GameObject>("Jogo/maco-jogo");
-            if (modelo == null) return false;
-
-            var copia = Instantiate(modelo, root.transform);
-            copia.transform.localScale = Vector3.one * Escala * 1.4f; // um pouco maior que o real, para se ver de longe
-            VisualRetro.Converter(copia);
-            Aparencia.PintaBomba(copia, GameSettings.Bomb);
-
-            Transform faisca = null, pavioVelho = null;
-            foreach (Transform t in copia.GetComponentsInChildren<Transform>(true))
-            {
-                if (t.name.StartsWith("Faisca")) faisca = t;
-                else if (t.name.StartsWith("Pavio")) pavioVelho = t;
-            }
-            if (faisca == null) { Destroy(copia); return false; }
-            if (pavioVelho != null) pavioVelho.gameObject.SetActive(false); // o cordao pronto sai; entra o que encurta
-
-            var cordao = new GameObject("Pavio vivo", typeof(MeshFilter), typeof(MeshRenderer));
-            cordao.transform.SetParent(faisca.parent, false);
-            var tinta = new Material(Shader.Find("BananaRoulette/Retro"));
-            tinta.SetColor("_BaseColor", new Color32(0x5A, 0x3A, 0x1C, 0xFF)); tinta.SetFloat("_SemLuz", 1f); tinta.SetFloat("_Cull", 0f);
-            cordao.GetComponent<MeshRenderer>().sharedMaterial = tinta;
-
-            // corpo do maco com materiais proprios, para poder clarear quando o pavio esta no fim
-            var corpo = new List<Material>();
-            foreach (Renderer r in copia.GetComponentsInChildren<Renderer>(true))
-            {
-                Material[] ms = r.sharedMaterials;
-                bool mudou = false;
-                for (int i = 0; i < ms.Length; i++)
-                {
-                    if (ms[i] == null || !ms[i].name.StartsWith("Dinamite")) continue;
-                    ms[i] = new Material(ms[i]) { name = ms[i].name };
-                    corpo.Add(ms[i]); mudou = true;
-                }
-                if (mudou) r.sharedMaterials = ms;
-            }
-
-            var rFaisca = faisca.GetComponentInChildren<Renderer>();
-            if (rFaisca != null) rFaisca.sharedMaterial = new Material(rFaisca.sharedMaterial);
-
-            // caminho do pavio na previa (eixo do three.js); aqui o X entra espelhado
-            var curva = new[]
-            {
-                new Vector3(-2f, 0f, 0f), new Vector3(-2.65f, 0.3f, 0.1f), new Vector3(-3.25f, -0.4f, 0.3f),
-                new Vector3(-3.8f, -1.08f, 0.2f), new Vector3(-4.4f, -1.1f, -0.1f)
-            };
-            var carrier = root.AddComponent<BananaCarrier>();
-            carrier.Setup3D(faisca, rFaisca, cordao.GetComponent<MeshFilter>(), curva, 0.09f, corpo.ToArray());
-            return true;
         }
 
         private Canvas BuildCanvas()

@@ -39,6 +39,9 @@ namespace BananaRoulette
         /// <summary>Ligado pelo bootstrap quando a partida tem o menu no caixote.</summary>
         public bool TemMenuDaPartida;
 
+        /// <summary>O macaco la atras, que joga a bomba nova para a roda depois de cada explosao. Nulo = a bomba so aparece.</summary>
+        public MacacoVisual Lancador;
+
         /// <summary>Verdadeiro enquanto a bomba esta na mao do jogador humano e a rodada corre.</summary>
         public bool BombaComJogador
         {
@@ -344,6 +347,7 @@ namespace BananaRoulette
 
             if (_shake != null) _shake.Shake(0.45f, 0.55f);
             StartCoroutine(FlashRoutine());
+            Explosao.Criar(victim.HandPosition, 1f);
             SomRetro.Ruido(0.7f, 0.7f, 180f, "lowpass");   // bum
             SomRetro.Tom(90f, 0.5f, "sine", 0.6f, 35f);
 
@@ -372,6 +376,19 @@ namespace BananaRoulette
                     _holderIndex = next;
                     _lastPasserIndex = -1;
                     _banana.gameObject.SetActive(true);
+
+                    // A bomba nova nao aparece do nada: o macaco la atras, cercado de bombas acesas, joga mais uma para a roda.
+                    if (Lancador != null && Lancador.PontoMaco != null)
+                    {
+                        _banana.UpdateFuseVisual(0f);
+                        _banana.transform.position = Lancador.PontoMaco.position;
+                        Lancador.Tocar(Lancador.transform.InverseTransformPoint(_slots[_holderIndex].transform.position).x < 0f ? "jogaE" : "jogaD");
+                        _slots[_holderIndex].Receber();
+                        SomRetro.Grito(820f, 520f, 0.25f, 0.4f);              // o grito de quem se livra dela
+                        SomRetro.Ruido(0.5f, 0.16f, 800f, "bandpass", 0.1f);  // a bomba no ar
+                        yield return _banana.FlyTo(_slots[_holderIndex], 0.95f, 6.5f);
+                        SomRetro.Grito(600f, 950f, 0.14f, 0.45f);
+                    }
                     _banana.SnapTo(_slots[_holderIndex]);
                 }
             }

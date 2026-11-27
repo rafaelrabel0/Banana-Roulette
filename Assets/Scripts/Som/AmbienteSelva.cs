@@ -4,12 +4,13 @@ using UnityEngine.SceneManagement;
 namespace BananaRoulette
 {
     /// <summary>
-    /// Som de fundo da floresta: passarinho, folha mexendo, inseto e um macaco ao longe.
+    /// Som de fundo da floresta: passarinho e folha mexendo. Inseto e macaco ao longe sairam: no menu pareciam
+    /// pavio queimando e macaco jogando, e confundiam.
     /// Tudo sorteado e fabricado por codigo (SomRetro). Entra sozinho em toda cena.
     /// </summary>
     public class AmbienteSelva : MonoBehaviour
     {
-        float passaro, folha, inseto, longe;
+        float passaro, folha;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Iniciar()
@@ -26,7 +27,7 @@ namespace BananaRoulette
 
         void Start()
         {
-            passaro = 1.5f; folha = 3f; inseto = 6f; longe = 12f;
+            passaro = 1.5f; folha = 3f;
         }
 
         void Update()
@@ -50,23 +51,6 @@ namespace BananaRoulette
             {
                 folha = Random.Range(5f, 11f);
                 SomRetro.Ruido(Random.value < 0.5f ? 1.2f : 1.8f, 0.03f, 3500f, "highpass");
-            }
-
-            // inseto: um trinado fino
-            inseto -= dt;
-            if (inseto <= 0f)
-            {
-                inseto = Random.Range(8f, 16f);
-                for (int i = 0; i < 6; i++) SomRetro.Tom(4300f, 0.03f, "sine", 0.018f, 0f, i * 0.05f);
-            }
-
-            // um macaco gritando la longe
-            longe -= dt;
-            if (longe <= 0f)
-            {
-                longe = Random.Range(14f, 28f);
-                SomRetro.Grito(380f, 560f, 0.16f, 0.07f);
-                SomRetro.Grito(420f, 620f, 0.2f, 0.07f, 0.22f);
             }
         }
     }

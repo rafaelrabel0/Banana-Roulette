@@ -344,6 +344,12 @@ namespace BananaRoulette
             _cordImage.color = new Color32(0xD8, 0xC0, 0x8E, 0xFF);
         }
 
+        /// <summary>Esconde so o pavio 3D (menu da partida aberto). A barra continua ligada para receber as ordens.</summary>
+        public void Mostrar3D(bool visivel)
+        {
+            if (_tres != null) _tres.gameObject.SetActive(visivel);
+        }
+
         public void SetVisible(bool visible)
         {
             if (_tres != null) _tres.gameObject.SetActive(visible);
