@@ -111,7 +111,15 @@ Se a cena não existir ou quebrar: menu de cima **Banana Roulette → Montar cen
 Se a cena aparecer de costas, selecione o objeto `Abertura` e desmarque
 **Girar Camera 180** no componente `Abertura Player`.
 
-### As duas cenas
+### Uma cena só
+
+Desde 27/11/2026 o jogo inteiro roda em `Assets/Scenes/Abertura.unity`: menu, abertura, partida e tutorial.
+Não há troca de cena. `Mundo.cs` põe a floresta na medida da partida; no fim da abertura o menu cria um
+`GameBootstrap` que aproveita o mundo e a câmera que já existem, e a câmera gira até as costas do jogador.
+`AppEntry.GoTo` passa por `MenuAbertura` (`AppEntry.Roteador`), que desmonta e monta a partida no lugar.
+A cena `Prototipo` ficou só para abrir a partida sozinha durante o desenvolvimento.
+
+### As duas cenas (como era)
 
 | Cena | O que tem | Quem monta |
 |------|-----------|------------|
@@ -204,7 +212,7 @@ e acrescentar o nome na lista de `Aparencia.cs`.
 
 ### O que ainda não veio
 
-- A abertura virar a partida sem corte, emojis/emotes, power-ups.
+- Emojis/emotes, power-ups.
 - Música gravada, fumaça na explosão.
 
 - O texto do **tutorial pintado** não vale: o botão TUTORIAL abre o tutorial do protótipo.

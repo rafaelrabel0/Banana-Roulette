@@ -28,6 +28,10 @@ namespace BananaRoulette
         /// <summary>Raio da roda na previa. O raio do jogo dividido por este da a escala do modelo.</summary>
         public static float RaioDaPrevia { get { Carrega(); return dados != null ? dados.raio : 15f; } }
         /// <summary>Centro da roda na previa, ja no eixo da Unity (X espelhado).</summary>
+        /// <summary>Os cinco lugares da roda da abertura, no eixo da Unity (X espelhado) e na medida da previa. O lugar 1 e o do jogador.</summary>
+        public static Vector3[] Lugares { get { Carrega(); return lugares; } }
+        static Vector3[] lugares;
+
         public static Vector3 CentroDaRoda { get { Carrega(); return dados != null && dados.roda != null ? new Vector3(-dados.roda[0], dados.roda[1], dados.roda[2]) : Vector3.zero; } }
 
         Animation anim;
@@ -71,7 +75,25 @@ namespace BananaRoulette
             var clipes = Resources.LoadAll<AnimationClip>("Jogo/macaco-jogo");
             clipe = clipes.Length > 0 ? clipes[0] : null;
             var texto = Resources.Load<TextAsset>("Jogo/macaco-jogo");
-            if (texto != null) dados = JsonUtility.FromJson<DadosJ>(texto.text);
+            if (texto != null)
+            {
+                dados = JsonUtility.FromJson<DadosJ>(texto.text);
+                // "lugares":[[x,z],[x,z],...] - lista de listas, que o JsonUtility nao le; e curto, entao vai na mao
+                int ini = texto.text.IndexOf("\"lugares\":[[");
+                if (ini >= 0)
+                {
+                    ini += 12;
+                    int fim = texto.text.IndexOf("]]", ini);
+                    string[] pares = texto.text.Substring(ini, fim - ini).Split(new[] { "],[" }, System.StringSplitOptions.None);
+                    lugares = new Vector3[pares.Length];
+                    var ponto = System.Globalization.CultureInfo.InvariantCulture;
+                    for (int i = 0; i < pares.Length; i++)
+                    {
+                        string[] n = pares[i].Trim('[', ']').Split(',');
+                        lugares[i] = new Vector3(-float.Parse(n[0], ponto), 0f, float.Parse(n[1], ponto));
+                    }
+                }
+            }
         }
 
         /// <summary>Cria um macaco como filho de <paramref name="pai"/>, sentado no chao, olhando para a frente do pai.</summary>

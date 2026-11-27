@@ -43,10 +43,20 @@ namespace BananaRoulette
         private Transform _faceDoMenu;   // tabua da frente do caixote de dinamite, onde o menu da partida e escrito
         private float _meiaFace = 0.17f;
 
-        private float Escala { get { return config.circleRadius / (MacacoVisual.RaioDaPrevia * 1.33f); } }
+        private float Escala { get { return Mundo.Escala(config.circleRadius); } }
+
+        /// <summary>
+        /// Cena unica: quando a partida nasce dentro da cena da abertura, o mundo e a camera ja existem.
+        /// Quem cria este componente preenche os dois antes do Start.
+        /// </summary>
+        [System.NonSerialized] public Transform mundoPronto;
+        [System.NonSerialized] public Camera cameraPronta;
+        private Transform _mundo;
 
         private void Start()
         {
+            if (config == null) config = Resources.Load<TuningConfig>("TuningConfig");
+            // na cena unica a musica nunca foi baixada para trocar de cena; aqui so garante que esta aberta
             if (config == null)
             {
                 config = ScriptableObject.CreateInstance<TuningConfig>();
@@ -60,9 +70,28 @@ namespace BananaRoulette
 
             if (usar3D && Resources.Load<GameObject>("Jogo/macaco-jogo") == null) usar3D = false;
 
-            var camera = BuildCamera();
-            if (usar3D) { BuildWorld(camera); }
-            else { BuildLighting(); BuildGround(); }
+            Camera camera;
+            bool chegando = cameraPronta != null && mundoPronto != null && usar3D;
+            Vector3 dePos = Vector3.zero; Quaternion deGiro = Quaternion.identity; float deCampo = 50f;
+            if (chegando)
+            {
+                // a camera da abertura vira a camera da partida: guarda de onde ela vem e ja a poe no lugar final,
+                // porque quem e criado a seguir (menu da partida, pavio do topo) mede a partir dela
+                camera = cameraPronta;
+                if (camera.GetComponent<CameraShake>() == null) camera.gameObject.AddComponent<CameraShake>();
+                dePos = camera.transform.position; deGiro = camera.transform.rotation; deCampo = camera.fieldOfView;
+                camera.transform.position = Mundo.CameraDoJogo(config.circleRadius);
+                camera.transform.LookAt(Mundo.OlharDoJogo);
+                camera.fieldOfView = 50f;
+                _mundo = mundoPronto;
+                AchaFaceDoMenu(mundoPronto.gameObject);
+            }
+            else
+            {
+                camera = BuildCamera();
+                if (usar3D) { BuildWorld(camera); }
+                else { BuildLighting(); BuildGround(); }
+            }
             BuildEventSystem();
 
             List<MonkeySlot> slots;
@@ -109,6 +138,42 @@ namespace BananaRoulette
                 default:
                     ShowMenu();
                     break;
+            }
+
+            if (chegando) StartCoroutine(Chega(camera, dePos, deGiro, deCampo));
+        }
+
+        // A camera sai de onde a abertura a deixou e gira ate ficar atras do jogador, olhando a roda.
+        private System.Collections.IEnumerator Chega(Camera camera, Vector3 dePos, Quaternion deGiro, float deCampo)
+        {
+            Vector3 atePos = camera.transform.position; Quaternion ateGiro = camera.transform.rotation; float ateCampo = camera.fieldOfView;
+            float t = 0f;
+            while (t < 1f)
+            {
+                t += Time.unscaledDeltaTime / 1.3f;
+                float s = Mathf.Clamp01(t); s = s * s * (3f - 2f * s);
+                camera.transform.SetPositionAndRotation(Vector3.Lerp(dePos, atePos, s), Quaternion.Slerp(deGiro, ateGiro, s));
+                camera.fieldOfView = Mathf.Lerp(deCampo, ateCampo, s);
+                yield return null;
+            }
+            camera.transform.SetPositionAndRotation(atePos, ateGiro);
+            camera.fieldOfView = ateCampo;
+        }
+
+        // A tabua da frente do caixote de dinamite fica lisa: e nela que o menu da partida e escrito.
+        private void AchaFaceDoMenu(GameObject mundo)
+        {
+            var lisa = Resources.Load<Texture2D>("Abertura/tampa-lisa");
+            foreach (Renderer r in mundo.GetComponentsInChildren<Renderer>(true))
+            {
+                foreach (Material m in r.sharedMaterials)
+                {
+                    if (m == null || !m.name.StartsWith("MenuFrente")) continue;
+                    _faceDoMenu = r.transform;
+                    var mf = r.GetComponent<MeshFilter>();
+                    if (mf != null && mf.sharedMesh != null) _meiaFace = mf.sharedMesh.bounds.extents.z;
+                    if (lisa != null && m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", lisa);
+                }
             }
         }
 
@@ -162,18 +227,21 @@ namespace BananaRoulette
         }
 
         /// <summary>
-        /// O cenario da abertura (floresta, caixotes, pedras) em volta da roda, com a luz de la.
-        /// O modelo vem na medida da previa: encolhe e gira para a roda cair no centro do jogo,
-        /// com os caixotes ao fundo.
+        /// Caminho da cena Prototipo, aberta sozinha: monta uma copia do cenario da abertura em volta da roda.
+        /// (No jogo normal a partida nasce dentro da cena da abertura e este metodo nao roda.)
         /// </summary>
         private void BuildWorld(Camera camera)
         {
             var mundo = new GameObject("Mundo");
+            _mundo = mundo.transform;
             var modelo = Resources.Load<GameObject>("Abertura/abertura");
             if (modelo != null)
             {
                 var copia = Instantiate(modelo, mundo.transform);
                 copia.name = "Cenario da abertura";
+                copia.transform.SetParent(null); // a transformacao vai na propria copia, como na cena da abertura
+                Destroy(mundo);
+                _mundo = copia.transform;
 
                 // poe as pecas na pose do instante zero da abertura (a do menu) e desliga a animacao
                 var clipes = Resources.LoadAll<AnimationClip>("Abertura/abertura");
@@ -190,44 +258,22 @@ namespace BananaRoulette
                     anim.enabled = false;
                 }
 
-                // os atores da abertura nao entram na partida
                 foreach (Transform t in copia.transform)
-                {
-                    string n = t.name;
-                    if (n.StartsWith("MacacoHeroi") || n.StartsWith("MacacoRoda") || n.StartsWith("Aviador") ||
-                        n.StartsWith("Balao") || n.StartsWith("Bituca") || n.StartsWith("Camera"))
-                        t.gameObject.SetActive(false);
-                }
+                    if (Mundo.EhAtor(t.name)) t.gameObject.SetActive(false);
                 VisualRetro.Converter(copia);
-
-                // a frente do caixote de dinamite fica lisa: e nela que o menu da partida e escrito
-                var lisa = Resources.Load<Texture2D>("Abertura/tampa-lisa");
-                foreach (Renderer r in copia.GetComponentsInChildren<Renderer>(true))
-                {
-                    foreach (Material m in r.sharedMaterials)
-                    {
-                        if (m == null || !m.name.StartsWith("MenuFrente")) continue;
-                        _faceDoMenu = r.transform;
-                        var mf = r.GetComponent<MeshFilter>();
-                        if (mf != null && mf.sharedMesh != null) _meiaFace = mf.sharedMesh.bounds.extents.z;
-                        if (lisa != null && m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", lisa);
-                    }
-                }
+                AchaFaceDoMenu(copia);
+                Mundo.Aplicar(copia.transform, config.circleRadius);
+                Mundo.Clareira(copia.transform, camera.transform.position, config.circleRadius);
             }
 
-            float e = Escala;
-            Quaternion giro = Quaternion.Euler(0f, 180f, 0f);
-            mundo.transform.localScale = Vector3.one * e;
-            mundo.transform.rotation = giro;
-            mundo.transform.position = -(giro * (MacacoVisual.CentroDaRoda * e));
-
             // Sol e ar da abertura. Na previa o sol fica em (40, 70, 50); aqui entra espelhado e girado junto com o mundo.
+            float e = Escala;
             var sol = new GameObject("Sol", typeof(Light));
             var luz = sol.GetComponent<Light>();
             luz.type = LightType.Directional;
             luz.intensity = 1.1f;
             luz.shadows = LightShadows.Soft;
-            sol.transform.rotation = Quaternion.LookRotation(-(giro * new Vector3(-40f, 70f, 50f)).normalized);
+            sol.transform.rotation = _mundo.rotation * Quaternion.LookRotation(-new Vector3(-40f, 70f, 50f).normalized);
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.72f, 0.72f, 0.68f);
@@ -237,18 +283,6 @@ namespace BananaRoulette
             RenderSettings.fogStartDistance = 125f * e;
             RenderSettings.fogEndDistance = 340f * e;
             camera.backgroundColor = CorSelva;
-
-            // Clareira: some com tronco, copa e pedra alta que ficariam entre a camera e a roda, ou dentro dela.
-            Vector2 de = new Vector2(camera.transform.position.x, camera.transform.position.z), ate = new Vector2(0f, config.circleRadius);
-            foreach (Renderer r in mundo.GetComponentsInChildren<Renderer>())
-            {
-                Bounds b = r.bounds;
-                if (b.size.y < 0.8f) continue; // capim e chao ficam
-                Vector2 p = new Vector2(b.center.x, b.center.z), eixo = ate - de;
-                float k = Mathf.Clamp01(Vector2.Dot(p - de, eixo) / eixo.sqrMagnitude);
-                float dist = (p - (de + eixo * k)).magnitude;
-                if (dist < config.circleRadius + 1.5f + Mathf.Max(b.extents.x, b.extents.z) * 0.5f) r.enabled = false;
-            }
         }
 
         /// <summary>
@@ -366,9 +400,11 @@ namespace BananaRoulette
                 if (usar3D)
                 {
                     // a capsula fica a 1 de altura; o modelo desce para sentar no chao
-                    var visual = MacacoVisual.Criar(body.transform, new Vector3(0f, -1f, 0f), Escala, Pelos[i % Pelos.Length]);
+                    // cada lugar repete a cor do macaco que estava ali na roda da abertura
+                    Color pelo = Pelos[(_mundo != null ? Mundo.LugarMaisPerto(_mundo, position) : i) % Pelos.Length];
+                    var visual = MacacoVisual.Criar(body.transform, new Vector3(0f, -1f, 0f), Escala, pelo);
                     if (isHuman) Aparencia.VestirJogador(visual);
-                    else Aparencia.VestirBot(visual, i);
+                    else Aparencia.VestirBot(visual, pelo);
                     slot.UsarModelo(visual);
                 }
 

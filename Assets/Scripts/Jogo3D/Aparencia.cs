@@ -69,12 +69,11 @@ namespace BananaRoulette
         }
 
         /// <summary>Veste um bot: pelo e acessorios sorteados, para a roda nao ficar toda igual.</summary>
-        public static void VestirBot(MacacoVisual m, int lugar)
+        public static void VestirBot(MacacoVisual m, Color pelo)
         {
             if (m == null) return;
-            // pelo diferente do jogador sempre que der
-            int pelo = Volta(GameSettings.Fur + lugar, Pelos.Length);
-            m.DefinirPelo(Pelos[pelo].cor);
+            // a cor e a do macaco que ocupava esse lugar na abertura
+            m.DefinirPelo(pelo);
             m.Vestir(Random.value < 0.5f ? "" : Chapeus[Random.Range(1, Chapeus.Length)].id,
                      Random.value < 0.65f ? "" : Oculos[Random.Range(1, Oculos.Length)].id,
                      Random.value < 0.7f ? "" : Brincos[Random.Range(1, Brincos.Length)].id);

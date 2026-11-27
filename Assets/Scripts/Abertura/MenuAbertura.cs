@@ -64,8 +64,13 @@ namespace BananaRoulette
         PaginaOpcoes pagina;
         bool pronto;
 
-        static Vector3 V(float x, float y, float z) { return new Vector3(-x, y, z); }
-        static Vector3 V(float[] a) { return new Vector3(-a[0], a[1], a[2]); }
+        // O mundo (a raiz do modelo da abertura) esta encolhido e girado para a roda cair no centro da partida.
+        // V = ponto dado no eixo da previa (three.js, X espelhado); W = ponto dado no eixo da Unity antes de encolher.
+        Transform mundo;
+        float e = 1f; // quanto o mundo encolheu
+        Vector3 V(float x, float y, float z) { return mundo.TransformPoint(new Vector3(-x, y, z)); }
+        Vector3 V(float[] a) { return mundo.TransformPoint(new Vector3(-a[0], a[1], a[2])); }
+        Vector3 W(Vector3 p) { return mundo.TransformPoint(p); }
         static float Suave(float k) { k = Mathf.Clamp01(k); return k * k * (3f - 2f * k); }
         static float Seg(float r, float a, float b) { return Mathf.Clamp01((r - a) / (b - a)); }
 
@@ -77,7 +82,20 @@ namespace BananaRoulette
             if (cam == null) cam = Camera.main;
             tocador.tocarAoIniciar = false;
             tocador.controlaCamera = false;
-            tocador.aoTerminar.AddListener(() => { if (modo == Modo.Cena) { modo = Modo.Fim; fimEm = Time.time + 1.6f; } });
+            // a abertura acabou: a partida comeca ali mesmo, sem esperar
+            tocador.aoTerminar.AddListener(() => { if (modo == Modo.Cena) { modo = Modo.Fim; fimEm = Time.time + 0.05f; } });
+
+            // ---- cena unica: o mundo vai para a escala e a posicao da partida, uma vez so ----
+            config = Resources.Load<TuningConfig>("TuningConfig");
+            raio = config != null ? config.circleRadius : 5f;
+            mundo = tocador.transform;
+            Mundo.Aplicar(mundo, raio);
+            e = mundo.lossyScale.x;
+            tocador.nevoaInicio *= e; tocador.nevoaFim *= e;
+            foreach (Light luz in FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (luz.type == LightType.Directional) luz.transform.rotation = mundo.rotation * luz.transform.rotation;
+            Mundo.Clareira(mundo, Mundo.CameraDoJogo(raio), raio);
+            AppEntry.Roteador = Roteia;
 
             texLisa = Resources.Load<Texture2D>("Abertura/tampa-lisa");
             texTampa[0] = Resources.Load<Texture2D>("Abertura/tampa-estudio");
@@ -167,7 +185,11 @@ namespace BananaRoulette
             pronto = true;
         }
 
-        void OnDestroy() { Loc.OnLanguageChanged -= AplicaIdioma; }
+        void OnDestroy()
+        {
+            Loc.OnLanguageChanged -= AplicaIdioma;
+            if (AppEntry.Roteador == Roteia) AppEntry.Roteador = null;
+        }
 
         static string T(string pt, string en) { return Loc.Current == Language.Portuguese ? pt : en; }
 
@@ -245,8 +267,8 @@ namespace BananaRoulette
             Destroy(go.GetComponent<Collider>());
             float[] c = d.creditos;
             go.transform.position = V(c[0], c[1], c[2]);
-            go.transform.rotation = Quaternion.Euler(90f, 180f, 0f);
-            go.transform.localScale = new Vector3(c[3], c[4], 1f);
+            go.transform.rotation = mundo.rotation * Quaternion.Euler(90f, 180f, 0f);
+            go.transform.localScale = new Vector3(c[3], c[4], 1f) * e;
             matCreditos = new Material(Shader.Find("Sprites/Default"));
             matCreditos.mainTexture = Resources.Load<Texture2D>("Abertura/creditos-chao");
             matCreditos.color = new Color(1f, 1f, 1f, 0f);
@@ -316,7 +338,7 @@ namespace BananaRoulette
 
         void Update()
         {
-            if (!pronto) return;
+            if (!pronto || emPartida) return;
             float dt = Time.deltaTime;
             Entrada();
             Passo(dt);
@@ -420,6 +442,15 @@ namespace BananaRoulette
             SomRetro.Ruido(0.5f, 0.2f, 500f, "bandpass");
             jaCarimbou = true;
             PoeTextura(matTampa, texEstudio);
+            // o macaco que recebe a bomba no fim da abertura e o jogador: ja aparece com a cor de pelo escolhida
+            foreach (Transform t in mundo)
+            {
+                if (!t.name.StartsWith("MacacoRoda1")) continue;
+                foreach (Renderer r in t.GetComponentsInChildren<Renderer>(true))
+                    foreach (Material m in r.sharedMaterials)
+                        if (m != null && m.name.StartsWith("Pelo") && !m.name.StartsWith("PeloClaro") && m.HasProperty("_BaseColor"))
+                            m.SetColor("_BaseColor", Aparencia.Pelo(GameSettings.Fur).cor);
+            }
             tocador.MisturarDe(cam.transform.position, cam.transform.rotation, cam.fieldOfView);
             tocador.controlaCamera = true;
             tocador.TocarDe(0.3f);
@@ -447,11 +478,12 @@ namespace BananaRoulette
             if (mostra == null)
             {
                 var lugar = new GameObject("Macaco de mostra");
-                lugar.transform.position = LugarDoMacaco;
-                lugar.transform.rotation = Quaternion.LookRotation(new Vector3(CamPersonagemP.x - LugarDoMacaco.x, 0f, CamPersonagemP.z - LugarDoMacaco.z));
-                mostra = MacacoVisual.Criar(lugar.transform, Vector3.zero, EscalaDaMostra, Aparencia.Pelo(GameSettings.Fur).cor);
+                lugar.transform.position = W(LugarDoMacaco);
+                Vector3 paraACamera = W(CamPersonagemP) - W(LugarDoMacaco); paraACamera.y = 0f;
+                lugar.transform.rotation = Quaternion.LookRotation(paraACamera);
+                mostra = MacacoVisual.Criar(lugar.transform, Vector3.zero, EscalaDaMostra * e, Aparencia.Pelo(GameSettings.Fur).cor);
                 bombaMostra = new GameObject("Bomba de mostra");
-                pavioDaMostra = BananaCarrier.Montar3D(bombaMostra, EscalaDaMostra, GameSettings.Bomb);
+                pavioDaMostra = BananaCarrier.Montar3D(bombaMostra, EscalaDaMostra * e, GameSettings.Bomb);
             }
             if (mostra != null) { mostra.transform.parent.gameObject.SetActive(true); mostra.Laco("segura1"); }
             if (bombaMostra != null) bombaMostra.SetActive(true);
@@ -500,7 +532,7 @@ namespace BananaRoulette
                     faseMostra = 1; tMostra = 0f;
                     jogouDe = mostra.PontoMaco.position;
                     pavioDaMostra.SeguirPonto(null);
-                    mostra.Tocar(mostra.transform.InverseTransformPoint(OndeEstoura).x < 0f ? "jogaE" : "jogaD");
+                    mostra.Tocar(mostra.transform.InverseTransformPoint(W(OndeEstoura)).x < 0f ? "jogaE" : "jogaD");
                     SomRetro.Grito(820f, 520f, 0.25f, 0.4f);
                     SomRetro.Ruido(0.4f, 0.16f, 800f, "bandpass");
                 }
@@ -508,13 +540,13 @@ namespace BananaRoulette
             else if (faseMostra == 1)
             {
                 float k = Mathf.Clamp01(tMostra / 0.75f);
-                Vector3 p = Vector3.Lerp(jogouDe, OndeEstoura, k);
-                p.y += Mathf.Sin(k * Mathf.PI) * 5f;
+                Vector3 p = Vector3.Lerp(jogouDe, W(OndeEstoura), k);
+                p.y += Mathf.Sin(k * Mathf.PI) * 5f * e;
                 bombaMostra.transform.position = p;
                 bombaMostra.transform.Rotate(Vector3.forward, 700f * dt, Space.Self);
                 if (k >= 1f)
                 {
-                    Explosao.Criar(OndeEstoura, 0.8f);
+                    Explosao.Criar(W(OndeEstoura), 0.5f);
                     SomRetro.Ruido(0.7f, 0.6f, 180f, "lowpass");
                     SomRetro.Tom(90f, 0.5f, "sine", 0.5f, 35f);
                     bombaMostra.SetActive(false);
@@ -537,7 +569,7 @@ namespace BananaRoulette
             else
             {
                 float k = Mathf.Clamp01(tMostra / 0.45f);
-                bombaMostra.transform.position = mostra.PontoMaco.position + Vector3.up * (16f * (1f - k * k));
+                bombaMostra.transform.position = mostra.PontoMaco.position + Vector3.up * (16f * e * (1f - k * k));
                 bombaMostra.transform.Rotate(Vector3.forward, 500f * dt, Space.Self);
                 if (k >= 1f)
                 {
@@ -575,6 +607,107 @@ namespace BananaRoulette
         }
 
         void ComecaPartida() { jaCarimbou = true; IrPara(AppEntry.Screen.Game); }
+
+        // ------------------------------------------------------------------ cena unica: a partida nasce e some aqui dentro
+
+        TuningConfig config;
+        float raio = 5f;
+        bool emPartida;
+        readonly System.Collections.Generic.HashSet<GameObject> antesDaPartida = new System.Collections.Generic.HashSet<GameObject>();
+
+        // AppEntry.GoTo passa por aqui: nada de carregar cena. Espera um quadro, porque quem pediu a troca
+        // costuma ser um objeto da propria partida, que vai ser destruido.
+        bool Roteia(AppEntry.Screen qual)
+        {
+            StartCoroutine(Troca(qual));
+            return true;
+        }
+
+        IEnumerator Troca(AppEntry.Screen qual)
+        {
+            yield return null;
+            if (emPartida) EncerraPartida();
+            if (qual == AppEntry.Screen.Menu) VaiParaOTitulo();
+            else IniciaPartida(qual);
+        }
+
+        void MostraAtores(bool sim)
+        {
+            foreach (Transform t in mundo)
+                if (Mundo.EhAtor(t.name) && t.gameObject.activeSelf != sim) t.gameObject.SetActive(sim);
+        }
+
+        // Monta a partida (ou o tutorial) por cima da cena, do jeito que ela esta. A camera segue de onde estiver.
+        void IniciaPartida(AppEntry.Screen qual)
+        {
+            jaCarimbou = true;
+            modo = modoAnt = Modo.Fim; fimEm = -1f; arcoAtivo = false;
+            if (pagina != null) pagina.Fechar();
+            if (paginaFrente != null) paginaFrente.Fechar();
+            if (mostra != null) mostra.transform.parent.gameObject.SetActive(false);
+            if (bombaMostra != null) bombaMostra.SetActive(false);
+            if (carimbo != null) carimbo.gameObject.SetActive(false);
+            if (seta != null) seta.gameObject.SetActive(false);
+            creditos.enabled = false;
+            dica.text = "";
+            StartCoroutine(ApagaLetreiro());
+
+            // a abertura para no quadro em que esta e os personagens dela saem de cena
+            tocador.Pausar();
+            tocador.controlaCamera = false;
+            tocador.enabled = false;
+            MostraAtores(false);
+
+            antesDaPartida.Clear();
+            foreach (GameObject go in gameObject.scene.GetRootGameObjects()) antesDaPartida.Add(go);
+
+            AppEntry.Next = qual;
+            var partida = new GameObject("GameBootstrap");
+            var montador = partida.AddComponent<GameBootstrap>();
+            montador.config = config;
+            montador.mundoPronto = mundo;
+            montador.cameraPronta = cam;
+            emPartida = true;
+        }
+
+        IEnumerator ApagaLetreiro()
+        {
+            yield return new WaitForSeconds(1.1f);
+            if (letreiro != null) letreiro.enabled = false;
+        }
+
+        // Desmonta a partida: some tudo o que nasceu depois dela e a cena volta a ser a do menu.
+        void EncerraPartida()
+        {
+            foreach (GameObject go in gameObject.scene.GetRootGameObjects())
+                if (!antesDaPartida.Contains(go)) Destroy(go);
+            foreach (Transform filho in cam.transform)
+                if (filho.name.StartsWith("Pavio do topo")) Destroy(filho.gameObject);
+            Time.timeScale = 1f;
+            MonkeySlot.Tensao = 0f;
+            MusicaRetro.Perigo = 0f;
+            emPartida = false;
+
+            tocador.enabled = true;
+            tocador.IrPara(0f);
+            tocador.Pausar();
+            MostraAtores(true);
+            AplicaIdioma(); // devolve a pintura do menu a frente do caixote
+            PoeTextura(matPagina, texLisa);
+            if (letreiro != null) letreiro.enabled = false;
+        }
+
+        // Volta para a tela "aperte qualquer tecla". A camera segue de onde estiver ate a logo.
+        void VaiParaOTitulo()
+        {
+            modo = modoAnt = Modo.Titulo; relogio = 8f; fimEm = -1f;
+            camPos = cam.transform.position;
+            camOlhar = cam.transform.position + cam.transform.forward * (17.5f * e);
+            camFov = cam.fieldOfView;
+            MusicaRetro.Tocar(MusicaRetro.Clima.Menu);
+            MusicaRetro.Abafar(false);
+            MusicaRetro.Volume(1f, 2.5f);
+        }
 
         void IrPara(AppEntry.Screen qual)
         {
@@ -652,8 +785,8 @@ namespace BananaRoulette
             float a = 1f - Mathf.Exp(-dt * (modo == Modo.Titulo && relogio < 7.5f ? 2.4f : 4.2f));
             if (modo == Modo.Personagem)
             {
-                camPos = Vector3.Lerp(camPos, CamPersonagemP, a);
-                camOlhar = Vector3.Lerp(camOlhar, CamPersonagemO, a);
+                camPos = Vector3.Lerp(camPos, W(CamPersonagemP), a);
+                camOlhar = Vector3.Lerp(camOlhar, W(CamPersonagemO), a);
                 camFov = Mathf.Lerp(camFov, CamPersonagemF, a);
                 return;
             }
@@ -697,8 +830,8 @@ namespace BananaRoulette
             {
                 float bate = modo == Modo.Carimbo && r >= 1f ? Mathf.Max(0f, 1f - (r - 1f) / 0.3f) : 0f;
                 Vector3 p = camPos;
-                p.x += Mathf.Sin(r * 0.5f) * 0.35f + Mathf.Sin(r * 70f) * 0.12f * bate;
-                p.y += Mathf.Sin(r * 0.37f) * 0.12f + Mathf.Cos(r * 83f) * 0.12f * bate;
+                p += cam.transform.right * ((Mathf.Sin(r * 0.5f) * 0.35f + Mathf.Sin(r * 70f) * 0.12f * bate) * e);
+                p.y += (Mathf.Sin(r * 0.37f) * 0.12f + Mathf.Cos(r * 83f) * 0.12f * bate) * e;
                 cam.transform.position = p;
                 cam.transform.LookAt(camOlhar);
                 cam.fieldOfView = camFov;
@@ -712,8 +845,8 @@ namespace BananaRoulette
                 float ch = Suave(Seg(r, 0.3f, 0.8f)), de = Mathf.Pow(Seg(r, 0.82f, 1f), 2f), so = Suave(Seg(r, 1.38f, 1.8f)), sa = Suave(Seg(r, 1.8f, 2.35f));
                 float alto = (1f - de) * (1f - so) + so, k = ch * (1f - sa);
                 carimbo.position = V(0f, d.tampaY + Mathf.Lerp(15f, 3.6f * (r < 1f ? 1f - de : so), k), Mathf.Lerp(-14f, 0f, k));
-                carimbo.rotation = Quaternion.Euler((0.5f * (1f - k) + 0.1f * alto * k) * Mathf.Rad2Deg, 0f, -0.06f * Mathf.Sin(r * 5f) * alto * Mathf.Rad2Deg);
-                carimbo.localScale = new Vector3(1f, r >= 1f && r < 1.38f ? 1f - 0.07f * Mathf.Max(0f, 1f - (r - 1f) / 0.12f) : 1f, 1f);
+                carimbo.rotation = mundo.rotation * Quaternion.Euler((0.5f * (1f - k) + 0.1f * alto * k) * Mathf.Rad2Deg, 0f, -0.06f * Mathf.Sin(r * 5f) * alto * Mathf.Rad2Deg);
+                carimbo.localScale = new Vector3(1f, r >= 1f && r < 1.38f ? 1f - 0.07f * Mathf.Max(0f, 1f - (r - 1f) / 0.12f) : 1f, 1f) * e;
             }
             if (noMenu) PoeTextura(matTampa, modo != Modo.Espera && (modo != Modo.Carimbo || r >= 1f) ? texEstudio : texLisa);
 

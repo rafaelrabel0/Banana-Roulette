@@ -83,7 +83,12 @@ namespace BananaRoulette
             alerta.SetActive(false);
         }
 
-        void OnDestroy() { Aberta = false; }
+        void OnDestroy()
+        {
+            Aberta = false;
+            MusicaRetro.Abafar(false);
+            if (pagina != null) Destroy(pagina.gameObject); // ela mora na frente do caixote, fora deste objeto
+        }
 
         public void Alternar() { if (Aberta) Fechar(1f); else Abrir(); }
 

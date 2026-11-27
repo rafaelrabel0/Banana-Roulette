@@ -25,8 +25,13 @@ namespace BananaRoulette
 
         private static UnityEngine.AsyncOperation carga;
 
+        /// <summary>Se alguem cuida da troca de tela sem carregar cena, registra-se aqui e devolve verdadeiro.</summary>
+        public static System.Func<Screen, bool> Roteador;
+
         public static void GoTo(Screen screen)
         {
+            // Na cena unica (menu + abertura + partida) nao ha troca de cena: o menu desmonta e monta a partida no lugar.
+            if (Roteador != null && Roteador(screen)) return;
             if (carga != null && !carga.isDone) return; // ja ha uma troca a caminho
             Next = screen;
             string cena = screen == Screen.Menu ? CenaDoMenu : CenaDoJogo;
