@@ -178,6 +178,34 @@ namespace BananaRoulette
         private readonly System.Collections.Generic.List<GameObject> _itens = new System.Collections.Generic.List<GameObject>();
         private int _bolsaMostrada;
 
+        /// <summary>A folha de emojis deste macaco (rosto com a cor e os acessorios dele).</summary>
+        public Texture2D Rosto { get { return _visual != null ? _visual.Rosto : null; } }
+
+        /// <summary>Onde fica a banana de vida mais nova, no mundo.</summary>
+        public Vector3 LugarDaVidaNova { get { return transform.TransformPoint(_lugarDoPe + _passoDaFila * Mathf.Max(0, Lives - 1)); } }
+
+        /// <summary>O meio da cabeca, no mundo.</summary>
+        public Vector3 Cabeca
+        {
+            get
+            {
+                if (_visual == null || _visual.Cabeca == null) return transform.position + Vector3.up * 2.6f;
+                return _visual.Cabeca.position + Vector3.up * (2.4f * _visual.transform.lossyScale.x);
+            }
+        }
+
+        /// <summary>Uma banana de vida solta (a mesma do chao), para o painel fotografar.</summary>
+        public static GameObject NovaBanana()
+        {
+            var go = new GameObject("Banana", typeof(MeshFilter), typeof(MeshRenderer));
+            go.GetComponent<MeshFilter>().sharedMesh = MalhaBanana();
+            go.GetComponent<Renderer>().sharedMaterial = Tinta(new Color(0.96f, 0.80f, 0.22f), true);
+            Material ponta = Tinta(new Color(0.30f, 0.20f, 0.10f));
+            Bloco(go.transform, new Vector3(-0.47f, 0.17f, 0.25f), Vector3.one * 0.07f, 30f, ponta);
+            Bloco(go.transform, new Vector3(0.49f, 0.2f, 0.28f), new Vector3(0.06f, 0.06f, 0.14f), -35f, ponta);
+            return go;
+        }
+
         /// <summary>Onde o poder guardado deste macaco fica, no mundo.</summary>
         public Vector3 LugarDoItem { get { return transform.TransformPoint(_lugarDoItem); } }
 
@@ -215,7 +243,7 @@ namespace BananaRoulette
             if (!IsAlive) return;
             for (int i = 0; i < Bolsa.Count; i++)
             {
-                GameObject it = ItemPoder.Criar(Bolsa[i], transform, _escalaDoItem);
+                GameObject it = ItemPoder.Criar(Bolsa[i], transform, _escalaDoItem, ItemPoder.Parte.SoObjeto);
                 if (it == null) continue;
                 it.transform.localPosition = _lugarDoItem + _passoDoItem * i;
                 it.transform.localRotation = Quaternion.Euler(0f, -35f + 25f * i, 0f);

@@ -90,16 +90,40 @@ namespace BananaRoulette
         }
 
         // Tira o objeto oferecido de cena. pegou = foi para o lado do macaco; senao a bombinha dele estoura.
-        private void SomeOferta(bool pegou)
+        private void SomeOferta(bool pegou, MonkeySlot holder = null, PowerUp qual = PowerUp.Nenhum)
         {
             if (_itemOferta == null) return;
             GameObject item = _itemOferta; _itemOferta = null;
+            // Pegou: ele desamarra o objeto (que aparece guardado atras dele) e joga a bombinha longe, onde ela estoura.
+            if (pegou && holder != null) StartCoroutine(JogaBombinha(qual, item.transform.position, holder));
             if (!pegou)
             {
                 Explosao.Criar(item.transform.position + Vector3.up * 0.3f, 0.3f);
                 SomRetro.Ruido(0.25f, 0.3f, 300f, "lowpass");
             }
             Destroy(item);
+        }
+
+        private IEnumerator JogaBombinha(PowerUp qual, Vector3 de, MonkeySlot holder)
+        {
+            float esc = holder.Visual != null ? holder.Visual.transform.localScale.x : 0.25f;
+            GameObject bombinha = ItemPoder.Criar(qual, null, esc * 1.25f, ItemPoder.Parte.SoBombinha);
+            if (bombinha == null) yield break;
+            Vector3 lado = holder.transform.right * (holder.Index % 2 == 0 ? -1f : 1f);
+            Vector3 ate = NoChao(de + (lado - holder.transform.forward * 0.55f).normalized * 9f) + Vector3.up * 0.3f;
+            SomRetro.Ruido(0.3f, 0.12f, 900f, "bandpass");
+            for (float t = 0f; t < 1f && bombinha != null; t += Time.deltaTime / 0.6f)
+            {
+                Vector3 q = Vector3.Lerp(de, ate, t); q.y += Mathf.Sin(t * Mathf.PI) * 4f;
+                bombinha.transform.position = q;
+                bombinha.transform.Rotate(0f, 0f, 900f * Time.deltaTime);
+                yield return null;
+            }
+            if (bombinha == null) yield break;
+            Explosao.Criar(ate, 0.35f);
+            SomRetro.Ruido(0.35f, 0.3f, 220f, "lowpass");
+            if (_shake != null) _shake.Shake(0.1f, 0.08f);
+            Destroy(bombinha);
         }
 
         // Quem usou mostra o objeto: ele sai do lado do macaco e vai ate o alvo (ataque) ou sobe na frente dele (ajuda).
@@ -211,7 +235,7 @@ namespace BananaRoulette
             quem.Bolsa.RemoveAt(qual);
             MostraInventario();
             bool ataque = PowerUps.EhAtaque(p);
-            StartCoroutine(MostraUso(p, quem, alvo, ataque));
+            StartCoroutine(CenasDePoder.Tocar(this, p, quem, alvo, _banana, _shake)); // so imagem: o efeito ja valeu acima
             _hud.SetStatus(QuemE(quem) + T(" USOU ", " USED ") + PowerUps.Nome(p).ToUpperInvariant() + (ataque ? T(" EM ", " ON ") + QuemE(alvo) : "") + "!",
                 ataque ? Palette.DynamiteRed : new Color(0.45f, 0.92f, 1f));
             if (ataque) { SomRetro.Tom(520f, 0.09f, "sawtooth", 0.1f, 260f); SomRetro.Tom(390f, 0.14f, "sawtooth", 0.1f, 190f, 0.1f); }
@@ -459,8 +483,9 @@ namespace BananaRoulette
             {
                 if (holder.Bolsa.Count < MonkeySlot.MaxNaBolsa) holder.Bolsa.Add(_oferta);
                 Trace(QuemE(holder) + " pegou o poder " + _oferta);
+                PowerUp pego = _oferta;
                 _oferta = PowerUp.Nenhum;
-                SomeOferta(true);
+                SomeOferta(true, holder, pego);
                 if (holder.IsHuman) { _hud.HidePowerUp(); MostraInventario(); }
                 SomRetro.Tom(784f, 0.08f, "square", 0.08f); SomRetro.Tom(1175f, 0.16f, "square", 0.08f, 0f, 0.09f);
             };

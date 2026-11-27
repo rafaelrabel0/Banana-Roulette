@@ -35,14 +35,20 @@ namespace BananaRoulette
             var go = new GameObject("Recados (emojis e emotes)");
             var r = go.AddComponent<Recados>();
             r.slots = slots; r.portador = portador; r.quemPassou = quemPassou; r.cam = camera;
-            r.folha = Resources.Load<Texture2D>("Jogo/emojis");
-            if (r.folha != null) r.folha.filterMode = FilterMode.Point;
-            r.MontaBarra(canvas);
+            r.StartCoroutine(r.MontaDepois(canvas)); // espera os macacos estarem vestidos: a fileira usa o rosto do jogador
             r.proximoBot = Time.time + 6f;
             return r;
         }
 
+        IEnumerator MontaDepois(Transform canvas)
+        {
+            yield return null; yield return null;
+            folha = slots.Count > 0 ? slots[0].Rosto : null;
+            MontaBarra(canvas);
+        }
+
         // Fileira de carinhas no canto de cima, com o numero de cada uma.
+        // As carinhas sao as do proprio jogador: mesma cor de pelo, mesmo chapeu, oculos e brinco.
         void MontaBarra(Transform canvas)
         {
             if (folha == null || canvas == null) return;
@@ -53,7 +59,7 @@ namespace BananaRoulette
                 go.transform.SetParent(canvas, false);
                 var img = go.GetComponent<RawImage>();
                 img.texture = folha; img.raycastTarget = false;
-                img.uvRect = new Rect(0f, 1f - (i + 1) / (float)Quantos, 1f / Quadros, 1f / Quantos);
+                img.uvRect = RostoDoMacaco.Recorte(i + 1, 0);
                 var rt = (RectTransform)go.transform;
                 rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
                 rt.anchoredPosition = new Vector2(-34f - (Quantos - 1 - i) * passo, -150f);
@@ -104,7 +110,7 @@ namespace BananaRoulette
         /// <summary>Manda um emoji (0 a 5) de um macaco para quem esta com a bomba.</summary>
         public void Mandar(MonkeySlot de, int emoji)
         {
-            if (folha == null || de == null || !de.IsAlive) return;
+            if (de == null || !de.IsAlive || de.Rosto == null) return;
             if (Time.time < proximo[de.Index % proximo.Length]) return;
             proximo[de.Index % proximo.Length] = Time.time + 1.2f;
 
@@ -147,7 +153,7 @@ namespace BananaRoulette
             go.GetComponent<MeshFilter>().sharedMesh = malha;
             var r = go.GetComponent<Renderer>();
             var m = new Material(Shader.Find("Sprites/Default"));
-            m.mainTexture = folha;
+            m.mainTexture = de.Rosto; // o emoji tem a cara de quem mandou
             int quadroAtual = -1;
             r.sharedMaterial = m;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -178,7 +184,8 @@ namespace BananaRoulette
                 if (quadro != quadroAtual)
                 {
                     quadroAtual = quadro;
-                    float u0 = quadro / (float)Quadros, u1 = (quadro + 1) / (float)Quadros, v0 = 1f - (emoji + 1) / (float)Quantos, v1 = 1f - emoji / (float)Quantos;
+                    Rect rc = RostoDoMacaco.Recorte(emoji + 1, quadro);
+                    float u0 = rc.xMin, u1 = rc.xMax, v0 = rc.yMin, v1 = rc.yMax;
                     malha.uv = new[] { new Vector2(u0, v0), new Vector2(u0, v1), new Vector2(u1, v1), new Vector2(u1, v0) };
                 }
                 yield return null;

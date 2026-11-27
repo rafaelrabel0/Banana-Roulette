@@ -71,6 +71,12 @@ namespace BananaRoulette
 
         public Transform PontoMaco { get; private set; }
 
+        // Como este macaco esta vestido agora (para montar o rosto em emoji dele).
+        public Color Pelo { get; private set; }
+        public string Chapeu = "", Oculos = "", Brinco = "";
+        /// <summary>A folha de emojis deste macaco: cor do pelo e acessorios dele.</summary>
+        public Texture2D Rosto { get { return RostoDoMacaco.Folha(Pelo, Chapeu, Oculos, Brinco); } }
+
         readonly List<Transform> acessorios = new List<Transform>();
 
         /// <summary>
@@ -87,6 +93,7 @@ namespace BananaRoulette
                 if (t.gameObject.activeSelf != liga) t.gameObject.SetActive(liga);
             }
             dobra = chapeu == "fone" ? 1.15f : chapeu == "cartola" ? 0.5f : 0f;
+            Chapeu = chapeu; Oculos = oculos; Brinco = brinco;
         }
 
         static void Carrega()
@@ -259,6 +266,7 @@ namespace BananaRoulette
         /// <summary>Troca a cor do pelo deste macaco.</summary>
         public void DefinirPelo(Color cor)
         {
+            Pelo = cor;
             foreach (var m in pelos) if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", cor);
             coresBase.Clear();
             foreach (var m in todos) coresBase.Add(m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : Color.white);
